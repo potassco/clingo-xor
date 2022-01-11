@@ -9,7 +9,6 @@ A system to solve XOR constraints efficiently still needs improvements. Since
 the system uses Bland's rule to select pivot elements, it also needs some
 thought whether the algorithm always terminates.
 
-
 ## Example
 
 Given its inheritance to clingo-lpx, the input to the system might look a bit
@@ -100,3 +99,9 @@ google-pprof --gv ./build/clingo-xor profile.out
 ## Literature
 
 - "Integrating Simplex with `DPLL(T)`" by Bruno Dutertre and Leonardo de Moura
+
+## TODO
+
+- add proper XOR costraints
+- implement pivoting more efficiently
+- propagate atoms (via the corresponding bounds of integer variables)
