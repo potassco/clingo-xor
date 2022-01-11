@@ -1,0 +1,36 @@
+Source: clingo-xor
+Section: devel
+Priority: optional
+Maintainer: Roland Kaminski <kaminski@cs.uni-potsdam.de>
+Build-Depends: debhelper-compat (= 11), dh-python, cmake, python3-dev, python3-cffi, libclingo-dev, libgmp-dev
+Standards-Version: 4.4.1
+Homepage: https://potassco.org/clingo-xor
+Vcs-Browser: https://github.com/potassco/clingo-xor
+Vcs-Git: https://github.com/potassco/clingo-xor.git
+
+Package: clingo-xor
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libclingo-xor (= ${binary:Version})
+Description: A solver for logic programs with linear constraints
+ This package contains the executables.
+
+Package: python3-clingo-xor
+Section: python
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python3:Depends}, libclingo-xor (= ${binary:Version}), python3-cffi-backend
+Description: A solver for logic programs with linear constraints
+ This package contains python bindings for clingo-xor.
+
+Package: libclingo-xor
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libclingo
+Description: A solver for logic programs with linear constraints
+ This package contains the shared library.
+
+Package: libclingo-xor-dev
+Section: libdevel
+Architecture: any
+Depends: ${misc:Depends}, libclingo-xor (= ${binary:Version})
+Description: A solver for logic programs with linear constraints
+ This package contains the development files.

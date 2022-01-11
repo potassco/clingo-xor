@@ -1,0 +1,223 @@
+# do not edit the workflows, they are generated from this file
+pip:
+    pure: False
+    version: |
+        version = None
+        with open('libclingo-xor/clingo-xor.h') as fh:
+            for line in fh:
+                m = match(r'#define CLINGOLPX_VERSION "([0-9]+\.[0-9]+\.[0-9]+)"', line)
+                if m is not None:
+                    version = m.group(1)
+    build_depends: |
+        sudo apt-get install gcc g++ cmake ninja-build
+        python3 -m pip install --user --upgrade scikit-build
+    install: |
+        if ARCH != "x86_64":
+            check_call(['sed', '-i', 's/, "cmake"//', 'pyproject.toml'])
+    build_depends_release: |
+        python3 -m pip install --user clingo
+    build_depends_dev: |
+        python3 -m pip install --user --extra-index-url https://test.pypi.org/simple/ clingo
+    winmac_images:
+        macos-latest:
+        windows-latest:
+
+conda:
+    package_name:
+        'clingo-xor'
+    os: 
+        - 'ubuntu-latest'
+        - 'macos-latest'
+        - 'windows-latest'
+    macosx-sdk:
+        'MacOSX10.9.sdk.tar.xz'
+    channels_release:
+        - 'potassco'
+    channels_dev:
+        - 'potassco/label/dev'
+        - 'potassco'
+    version: |
+        version = None
+        with open('libclingo-xor/clingo-xor.h') as fh:
+            for line in fh:
+                m = match(r'#define CLINGOLPX_VERSION "([0-9]+\.[0-9]+\.[0-9]+)"', line)
+                if m is not None:
+                    version = m.group(1)
+    meta:
+        url: https://github.com/potassco/{{ name }}/archive/v{{ version }}.tar.gz
+        git_url: https://github.com/potassco/{{ name }}.git
+        requirements:
+            build:
+                - cmake
+                - ninja [win]
+                - "{{ compiler('c') }}"
+                - "{{ compiler('cxx') }}"
+            host:
+                - clingo
+                - python
+                - gmp [not win]
+            run:
+                - "{{ pin_compatible('clingo') }}"
+                - python
+                - cffi
+                - gmp [not win]
+        build:
+            skip: True [win and vc<14]
+        test:
+            commands:
+                - '{{ name }} --version'
+                - 'python -m clingoxor --version'
+        about:
+            home: https://potassco.org/
+            license: MIT
+            summary: A solver for logic programs with difference constraints.
+            description: The clingo-xor solver extends the clingo ASP system with support for difference logic constraints.
+            license_file: LICENSE
+            doc_url: https://potassco.org/
+            dev_url: https://github.com/potassco/{{ name }}
+
+    build_sh: |
+        #!/bin/bash
+
+        mkdir build
+        cd build
+
+        cmake .. \
+            -DCLINGOLPX_MANAGE_RPATH=Off \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER="${CXX}" \
+            -DCMAKE_INSTALL_LIBDIR="lib" \
+            -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
+            -DPYCLINGOLPX_ENABLE="require" \
+            -DPython_ROOT_DIR="${PREFIX}"
+
+        make -j${CPU_COUNT}
+        make install
+
+    build_bat: |
+        mkdir build
+
+        cmake -G "Ninja" -H. -Bbuild ^
+            -DCLINGOLPX_MANAGE_RPATH=Off ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DCMAKE_CXX_COMPILER="%CXX%" ^
+            -DCMAKE_INSTALL_BINDIR="." ^
+            -DCMAKE_INSTALL_PREFIX="%PREFIX%" ^
+            -DPYCLINGOLPX_ENABLE="require" ^
+            -DPython_ROOT_DIR="%PREFIX%"
+
+        cmake --build build
+        cmake --build build --target install
+
+    build_config: |
+        python:
+            - 3.6
+            - 3.7
+            - 3.8
+            - 3.9
+
+        clingo:
+            - 5.5
+
+        pin_run_as_build:
+            clingo: x.x
+
+        # from https://github.com/phracker/MacOSX-SDKs
+        CONDA_BUILD_SYSROOT:
+            - /opt/MacOSX10.9.sdk # [osx]
+
+ppa:
+    package_name:
+        'clingo-xor'
+    upstream_name:
+        'clingo-xor'
+    initial_version:
+        '1.0.0'
+    initial_date:
+        'Fri, 02 Jan 2021 13:32:11 +0100'
+    contact_url:
+        'https://github.com/potassco/clingo-xor/issues'
+    source_url:
+        'https://github.com/potassco/clingo-xor'
+    version: |-
+        $(sed -n '/#define CLINGOLPX_VERSION "/s/.*"\([0-9]\+\.[0-9\+]\.[0-9]\+\)".*/\1/p' ../../libclingo-xor/clingo-xor.h)
+    build_depends:
+        - 'dh-python'
+    create_depends: []
+    sync_patterns:
+        - 'app'
+        - 'cmake'
+        - 'lib*'
+        - 'CMakeLists.txt'
+        - 'README.md'
+        - 'INSTALL.md'
+        - 'LICENSE'
+        - 'CHANGES.md'
+    distributions:
+        focal:
+        bionic:
+            source:
+                Build-Depends: 'debhelper-compat (= 11), dh-python, cmake, python3-dev, python3-cffi, libclingo-dev, libgmp-dev'
+    source:
+        Source: 'clingo-xor'
+        Section: 'devel'
+        Priority: 'optional'
+        Maintainer: 'Roland Kaminski <kaminski@cs.uni-potsdam.de>'
+        Build-Depends: 'debhelper-compat (= 12), dh-python, cmake, python3-dev, python3-cffi, libclingo-dev, libgmp-dev'
+        Standards-Version: '4.4.1'
+        Homepage: 'https://potassco.org/clingo-xor'
+        Vcs-Browser: 'https://github.com/potassco/clingo-xor'
+        Vcs-Git: 'https://github.com/potassco/clingo-xor.git'
+
+    packages:
+        clingo-xor:
+            Architecture: 'any'
+            Depends: '${shlibs:Depends}, ${misc:Depends}, libclingo-xor (= ${binary:Version})'
+            Description: |
+                A solver for logic programs with linear constraints
+                 This package contains the executables.
+
+        python3-clingo-xor:
+            Section: 'python'
+            Architecture: 'any'
+            Depends: '${shlibs:Depends}, ${misc:Depends}, ${python3:Depends}, libclingo-xor (= ${binary:Version}), python3-cffi-backend'
+            Description: |
+                A solver for logic programs with linear constraints
+                 This package contains python bindings for clingo-xor.
+
+        libclingo-xor:
+            Section: 'libs'
+            Architecture: 'any'
+            Depends: '${shlibs:Depends}, ${misc:Depends}, libclingo'
+            Description: |
+                A solver for logic programs with linear constraints
+                 This package contains the shared library.
+
+        libclingo-xor-dev:
+            Section: 'libdevel'
+            Architecture: 'any'
+            Depends: '${misc:Depends}, libclingo-xor (= ${binary:Version})'
+            Description: |
+                A solver for logic programs with linear constraints
+                 This package contains the development files.
+
+    files:
+        docs: |
+            README.md
+        clingo-xor.install: |
+            /usr/bin/*
+        python3-clingo-xor.install: |
+            /usr/lib/python3/dist-packages/*
+        libclingo-xor.install: |
+            /usr/lib/*/*.so*
+        libclingo-xor-dev.install: |
+            /usr/include/*
+            /usr/lib/*/cmake/*
+        rules: |
+            #!/usr/bin/make -f
+            
+            %:
+            	dh $@ --with python3
+
+            override_dh_auto_configure:
+            	dh_auto_configure -- -DCMAKE_LIBRARY_PATH=$(DEB_HOST_MULTIARCH) -DPYCLINGOLPX_ENABLE=require -DCLINGOLPX_MANAGE_RPATH=Off -DPYCLINGOLPX_INSTALL_DIR=/usr/lib/python3/dist-packages

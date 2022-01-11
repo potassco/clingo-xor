@@ -1,0 +1,13 @@
+include setup.py
+include pyproject.toml
+include CMakeLists.txt
+include LICENSE
+include README.md
+recursive-include app *
+recursive-include cmake *
+recursive-include libclingo-xor *
+include libpyclingo-xor/*.c
+include libpyclingo-xor/CMakeLists.txt
+recursive-include libpyclingo-xor/clingoxor *.py *.typed
+prune _skbuild
+global-exclude *.py[cod]
