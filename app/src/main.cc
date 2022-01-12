@@ -66,21 +66,6 @@ public:
                 std::cout << sym;
                 comma = true;
             }
-            std::cout << "\nAssignment:\n";
-            symbols = model.symbols(Clingo::ShowType::Theory);
-            std::sort(symbols.begin(), symbols.end());
-            comma = false;
-            for (auto const &sym : symbols) {
-                if (std::strcmp("__xor", sym.name()) != 0) {
-                    continue;
-                }
-                if (comma) {
-                    std::cout << " ";
-                }
-                auto args = sym.arguments();
-                std::cout << args.front() << "=" << args.back().string();
-                comma = true;
-            }
             std::cout << std::endl;
         }
         catch(...) {

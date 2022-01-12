@@ -556,7 +556,7 @@ void Propagator::init(Clingo::PropagateInit &init) {
     }
 
     std::unordered_map<Clingo::Symbol, Term&> cos;
-    evaluate_theory(init.theory_atoms(), [&](Clingo::literal_t lit) { return init.solver_literal(lit); }, aux_map_, iqs_);
+    evaluate_theory(init, aux_map_, iqs_);
     for (auto &x : iqs_) {
         auto ib = x.lhs.begin();
         auto ie = x.lhs.end();

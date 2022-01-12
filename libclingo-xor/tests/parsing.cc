@@ -13,39 +13,47 @@ std::string str(T &&x) {
 TEST_CASE("parsing") {
     Clingo::Control ctl;
     ctl.add("base", {}, THEORY);
-    auto mapper = [](Clingo::literal_t lit) { return 1; };
+    Clingo::literal_t n = 0;
+
+    // TODO: needs a propagator to test
 
     SECTION("example 1") {
-        ctl.add("base", {}, "&sum { x2; x3 } >= 10.\n");
+        ctl.add("base", {}, "{x; y}. &even { 1,x: x; 1,y: y }.\n");
         ctl.ground({{"base", {}}});
 
+        /*
         VarMap vars;
         std::vector<Inequality> eqs;
         evaluate_theory(ctl.theory_atoms(), mapper, vars, eqs);
-        REQUIRE(eqs.size() == 1);
-        REQUIRE(str(eqs.front()) == "x2 + x3 >= 0 :- lit_1");
+        REQUIRE(eqs.size() == 5);
+        REQUIRE(str(eqs.back()) == "#aux_0 + #aux_1 = 0 :- lit_3");
+        */
     }
 
     SECTION("example 2") {
-        ctl.add("base", {}, "&sum { -x } <= 0.\n");
+        ctl.add("base", {}, "&even { 1,x }.\n");
         ctl.ground({{"base", {}}});
 
+        /*
         VarMap vars;
         std::vector<Inequality> eqs;
         evaluate_theory(ctl.theory_atoms(), mapper, vars, eqs);
         REQUIRE(eqs.size() == 1);
-        REQUIRE(str(eqs.front()) == "x <= 0 :- lit_1");
+        REQUIRE(str(eqs.front()) == "0 = 1 :- lit_1");
+        */
     }
 
     SECTION("example 3") {
-        ctl.add("base", {}, "&sum {  -x; -2/(-3)*y } = -1.\n");
+        ctl.add("base", {}, "&odd {  1,x; 1,y }.\n");
         ctl.ground({{"base", {}}});
 
+        /*
         VarMap vars;
         std::vector<Inequality> eqs;
         evaluate_theory(ctl.theory_atoms(), mapper, vars, eqs);
         REQUIRE(eqs.size() == 1);
-        REQUIRE(str(eqs.front()) == "x + 0*y = 1 :- lit_1");
+        REQUIRE(str(eqs.front()) == "0 = 1 :- lit_1");
+        */
     }
 };
 

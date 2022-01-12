@@ -9,23 +9,18 @@ A system to solve XOR constraints efficiently still needs improvements. Since
 the system uses Bland's rule to select pivot elements, it also needs some
 thought whether the algorithm always terminates.
 
-## Example
+## Input
 
-Given its inheritance to clingo-lpx, the input to the system might look a bit
-unusual. Ideally, there would be a dedicated XOR constraint and no need to
-connect atoms and integer variables. For now, we can express the constraint
-`XOR(x,y)` as follows:
+The system supports `&even` and `&odd` constraints over integers in rule heads.
+The elements of the constraint are tuples with conditions where the first
+element of the tuple must be an integer.
+
+The following program corresponds to `p(1) xor p(2) xor p(3)`:
 
 ```
-{ x; y }.
+{ p(1..3) }.
 
-&sum { x; y } >= 1.
-
-&sum { x } >= 1 :-     x.
-&sum { x } <= 0 :- not x.
-
-&sum { y } >= 1 :-     y.
-&sum { y } <= 0 :- not y.
+&odd { 1,X: p(X) }.
 ```
 
 ## Installation
@@ -43,38 +38,6 @@ cmake --build build
 [cmake]: https://cmake.org
 [clingo]: https://github.com/potassco/clingo
 [anaconda]: https://anaconda.org
-
-## Input format
-
-It does not make much sense, but clingo-xor shares the same input syntax as
-clingo-lpx. All arithmetics is performed modulo 2. This means we have
-```
-x = -x = |x| mod 2`.
-```
-
-The system supports `&sum` constraints over rationals with relations among
-`<=`, `>=`, and `=`. The elements of the sum constraints must have form `x`,
-`-x`, `n*x`, `-n*x`, or `-n/d*x` where `x` is a function symbol or tuple, and
-`n` and `d` are non-negative integers.
-
-For example, the following program is accepted:
-```
-{ x }.
-&sum { x; -y; 2*x; -3*y; 2/3*x; -3/4*y } >= 100 :- x.
-```
-
-Furthermore, `&dom` constraints are supported, which are shortcuts for `&sum`
-constraints. The program
-```
-{ x }.
-&dom { 1..2 } = x.
-```
-is equivalent to
-```
-{ x }.
-&sum { x } >= 1.
-&sum { x } <= 2.
-```
 
 ## Profiling
 
@@ -102,6 +65,6 @@ google-pprof --gv ./build/clingo-xor profile.out
 
 ## TODO
 
-- add proper XOR costraints
+- there still seems to be a bug (see `tests/parsing.cc`)
 - implement pivoting more efficiently
 - propagate atoms (via the corresponding bounds of integer variables)

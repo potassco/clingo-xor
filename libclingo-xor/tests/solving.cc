@@ -99,32 +99,36 @@ size_t run_m(std::initializer_list<char const *> m) {
 
 TEST_CASE("solving") {
     SECTION("single-shot") {
-        REQUIRE( run("&sum { x1; x2 } <= 20.\n"
-                     "&sum { x1; x3 } =   5.\n"
-                     "&sum { x2; x3 } >= 10.\n"));
+        REQUIRE( run("{x; y; z}.\n"
+                     "&even { 1,x:x; 1,y:y }.\n"
+                     "&odd  { 1,x:x; 1,z:z }.\n"));
 
-        REQUIRE(!run("&sum { x } >= 1.\n"
-                     "&sum { x } <= 0.\n"));
+        REQUIRE(!run("{x}.\n"
+                     "&odd  { 1,x:x }.\n"
+                     "&even { 1,x:x }.\n"));
 
-        REQUIRE(!run("&sum { x; y } >= 1.\n"
-                     "&sum { x; y } <= 0.\n"
-                     "&sum {    y } =  0.\n"));
+        REQUIRE(!run("{x; y}.\n"
+                     "&odd  { 1,x:x; 1,y:y }.\n"
+                     "&even { 1,x:x; 1,y:y }.\n"
+                     "&even {        1,y:y }.\n"));
 
-        REQUIRE( run("&sum {   x;   y } >= 0.\n"
-                     "&sum {        y } >= 0.\n"
-                     "&sum {   x      } >= 1.\n"));
+        REQUIRE( run("{x; y}.\n"
+                     "&even { 1,x:x; 1,y:y }.\n"
+                     "&odd  {        1,y:y }.\n"
+                     "&odd  { 1,x:x        }.\n"));
     }
     SECTION("multi-shot") {
-        REQUIRE( run_m({"&sum { x1; x2 } = 0.\n"
-                        "&sum { x3 } >= 1.\n",
-                        "&sum { x1 } = 1.\n",
-                        "&sum { x2 } = 0.\n"}) == 2);
-        REQUIRE( run_m({"{a; b}.\n"
-                        "&sum { x1: a; x2: b } = 0.\n",
-                        "&sum { x1 } = 1.\n"
-                        "&sum { x2 } = 0.\n",
+        REQUIRE( run_m({"{x; y; z}.\n"
+                        "&even { 1,x:x; 1,y:y }.\n"
+                        "&odd  { 1,z:z }.\n",
+                        "&odd  { 1,x:x }.\n",
+                        "&even { 1,y:y }.\n"}) == 3);
+        REQUIRE( run_m({"{x; y; a; b}.\n"
+                        "&even { 1,x: x, a; 1,y: y, b }.\n",
+                        "&odd  { 1: x }.\n"
+                        "&even { 1: y }.\n",
                         ":- a.\n"
-                        ":- b.\n"}) == 7);
+                        ":- b.\n"}) == 13);
     }
 };
 

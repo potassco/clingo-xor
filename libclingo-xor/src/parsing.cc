@@ -31,14 +31,14 @@ bool is_string(Clingo::TheoryTerm const &term) {
     }
     char const *name = term.name();
     size_t len = std::strlen(term.name());
-    return len >= 2 && name[0] == '"' && name[len - 1] == '"';
+    return len >= 2 && name[0] == '"' && name[len - 1] == '"'; // NOLINT
 }
 
 [[nodiscard]] Clingo::Symbol evaluate(Clingo::TheoryTerm const &term) {
     if (is_string(term)) {
         char const *name = term.name();
         size_t len = std::strlen(term.name());
-        return Clingo::String(std::string{name + 1, name + len - 1}.c_str());
+        return Clingo::String(std::string{name + 1, name + len - 1}.c_str()); // NOLINT
     }
 
     if (term.type() == Clingo::TheoryTermType::Symbol) {
@@ -48,19 +48,6 @@ bool is_string(Clingo::TheoryTerm const &term) {
     if (term.type() == Clingo::TheoryTermType::Number) {
         return Clingo::Number(term.number());
     }
-
-    if (match(term, "-", 1)) {
-        auto arg = evaluate(term.arguments().back());
-        if (arg.type() == Clingo::SymbolType::Number) {
-            return Clingo::Number(-arg.number());
-        }
-        if (arg.type() == Clingo::SymbolType::Function) {
-            return Clingo::Function(arg.name(), arg.arguments(), !arg.is_positive());
-        }
-        return throw_syntax_error<Clingo::Symbol>();
-    }
-
-    check_syntax(!match(term, "..", 2) && !match(term, "*", 2) && !match(term, "/", 2));
 
     if (term.type() == Clingo::TheoryTermType::Tuple || term.type() == Clingo::TheoryTermType::Function) {
         std::vector<Clingo::Symbol> args;
@@ -74,104 +61,97 @@ bool is_string(Clingo::TheoryTerm const &term) {
     return throw_syntax_error<Clingo::Symbol>();
 }
 
-[[nodiscard]] Clingo::Symbol evaluate_var(Clingo::TheoryTerm const &term) {
-    check_syntax(
-        !match(term, "-", 1) &&
-        !match(term, "..", 2) &&
-        !match(term, "*", 2) &&
-        !match(term, "/", 2));
-    check_syntax(
-        term.type() == Clingo::TheoryTermType::Tuple ||
-        term.type() == Clingo::TheoryTermType::Function ||
-        term.type() == Clingo::TheoryTermType::Symbol);
-
-    return evaluate(term);
-}
-
-[[nodiscard]] Number evaluate_num(Clingo::TheoryTerm const &term) {
-    if (term.type() == Clingo::TheoryTermType::Number) {
-        return {term.number()};
-    }
-
-    if (match(term, "-", 1)) {
-        return -evaluate_num(term.arguments().front());
-    }
-    if (match(term, "*", 2)) {
-        return evaluate_num(term.arguments().front()) * evaluate_num(term.arguments().back());
-    }
-    if (match(term, "/", 2)) {
-        return evaluate_num(term.arguments().front()) / evaluate_num(term.arguments().back());
-    }
-
-    return throw_syntax_error<Number>();
-}
-
-[[nodiscard]] Relation evaluate_cmp(char const *rel) {
-    if (std::strcmp(rel, "<=") == 0) {
-        return Relation::LessEqual;
-    }
-    if (std::strcmp(rel, ">=") == 0) {
-        return Relation::GreaterEqual;
-    }
-    if (std::strcmp(rel, "=") == 0) {
-        return Relation::Equal;
-    }
-    if (std::strcmp(rel, ">") == 0) {
-        return Relation::Greater;
-    }
-    if (std::strcmp(rel, "<") == 0) {
-        return Relation::Less;
-    }
-    return throw_syntax_error<Relation>();
-}
-
 } // namespace
 
-void evaluate_theory(Clingo::TheoryAtoms const &theory, LitMapper const &mapper, VarMap &var_map, std::vector<Inequality> &iqs) {
+void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<Inequality> &iqs) {
+    auto theory = init.theory_atoms();
     for (auto &&atom : theory) {
-        if (match(atom.term(), "dom", 0)) {
-            check_syntax(atom.elements().size() == 1);
-            auto &&elem = atom.elements().front();
-            check_syntax(elem.tuple().size() == 1 && elem.condition().empty());
-            auto &&term = elem.tuple().front();
-            check_syntax(match(term, "..", 2));
-            auto var = evaluate_var(atom.guard().second);
-            auto lit = mapper(atom.literal());
-            iqs.emplace_back(Inequality{{{1, var}}, evaluate_num(term.arguments().back()), Relation::LessEqual, lit});
-            iqs.emplace_back(Inequality{{{1, var}}, evaluate_num(term.arguments().front()), Relation::GreaterEqual, lit});
-        }
-        else if (match(atom.term(), "sum", 0)) {
-            std::vector<Term> lhs;
+        bool even = match(atom.term(), "even", 0);
+        bool odd  = match(atom.term(), "odd", 0);
+        if (even || odd) {
+            // map from tuples to condition
+            std::map<std::vector<Clingo::Symbol>, size_t> elem_ids;
+            std::vector<std::vector<Clingo::literal_t>> elems;
             for (auto &&elem : atom.elements()) {
-                check_syntax(elem.tuple().size() == 1);
-                auto &&term = elem.tuple().front();
-                if (match(term, "-", 1)) {
-                    lhs.emplace_back(Term{
-                        -1,
-                        evaluate_var(term.arguments().back())});
+                check_syntax(!elem.tuple().empty());
+                std::vector<Clingo::Symbol> tuple;
+                tuple.reserve(elem.tuple().size());
+                for (auto &&term : elem.tuple()) {
+                    tuple.emplace_back(evaluate(term));
                 }
-                else if (match(term, "*", 2)) {
-                    lhs.emplace_back(Term{
-                        evaluate_num(term.arguments().front()),
-                        evaluate_var(term.arguments().back())});
+                check_syntax(tuple.front().type() == Clingo::SymbolType::Number, "first element of tuple must be an integer");
+                if (tuple.front().number() % 2 == 0) {
+                    continue;
+                }
+                auto res = elem_ids.emplace(std::move(tuple), elems.size());
+                auto lit = elem.condition().empty() ? 0 : init.solver_literal(elem.condition_id());
+                if (res.second) {
+                    elems.emplace_back();
+                    if (lit != 0) {
+                        elems.back().emplace_back(lit);
+                    }
                 }
                 else {
-                    lhs.emplace_back(Term{1, evaluate_var(term)});
-                }
-                if (!elem.condition().empty()) {
-                    auto res = var_map.try_emplace(std::make_pair(lhs.back().var, elem.condition_id()), Clingo::Number(var_map.size()));
-                    if (res.second) {
-                        auto lit = mapper(elem.condition_id());
-                        iqs.emplace_back(Inequality{{{1, res.first->second}}, 0, Relation::Equal, -lit});
-                        iqs.emplace_back(Inequality{{{1, res.first->second}, {-1, lhs.back().var}}, 0, Relation::Equal, lit});
+                    auto lits = elems[res.first->second];
+                    if (lit != 0) {
+                        lits.emplace_back(lit);
                     }
-                    lhs.back().var = res.first->second;
+                    else {
+                        lits.clear();
+                    }
                 }
             }
-            auto lit = mapper(atom.literal());
+            // sort conditions and find duplicates
+            std::map<std::reference_wrapper<std::vector<Clingo::literal_t>>, size_t, std::less<std::vector<Clingo::literal_t>>> seen; // NOLINT
+            for (auto &lits : elems) {
+                std::sort(lits.begin(), lits.end());
+                lits.erase(std::unique(lits.begin(), lits.end()), lits.end());
+                seen[lits] += 1;
+            }
+            // build inequalities
+            Number rhs{even ? 0 : 1};
+            std::vector<Term> lhs;
+            for (auto &&lits : elems) {
+                auto it = seen.find(lits);
+                if (it->second % 2 == 0) {
+                    continue;
+                }
+                it->second = 0;
+                if (lits.empty()) {
+                    rhs += 1;
+                }
+                else {
+                    Clingo::literal_t eq_lit{0};
+                    if (lits.size() == 1) {
+                        eq_lit = lits.front();
+                    }
+                    else {
+                        eq_lit = init.add_literal();
+                        std::vector<Clingo::literal_t> clause;
+                        clause.reserve(lits.size() + 1);
+                        clause.emplace_back(-eq_lit);
+                        for (auto &&lit : lits) {
+                            clause.emplace_back(lit);
+                            init.add_clause({-lit, eq_lit});
+                        }
+                        init.add_clause(clause);
+                    }
+                    auto res = var_map.try_emplace(eq_lit, Clingo::Number(var_map.size()));
+                    if (res.second) {
+                        // FIXME: LessEqual and GreaterEqual should be usable
+                        // but this leads to a bug with multi-shot solving
+                        iqs.emplace_back(Inequality{{{1, res.first->second}}, 0, Relation::Equal, -eq_lit});
+                        iqs.emplace_back(Inequality{{{1, res.first->second}}, 1, Relation::Equal, eq_lit});
+                    }
+                    lhs.emplace_back(Term{1, res.first->second});
+                }
+            }
+            auto lit = init.solver_literal(atom.literal());
+            // FIXME: LessEqual and GreaterEqual should be usable
+            // but this leads to a bug with multi-shot solving
             iqs.emplace_back(Inequality{std::move(lhs),
-                                        evaluate_num(atom.guard().second),
-                                        evaluate_cmp(atom.guard().first),
+                                        rhs,
+                                        Relation::Equal,
                                         lit});
         }
     }
