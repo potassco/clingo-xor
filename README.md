@@ -65,6 +65,5 @@ google-pprof --gv ./build/clingo-xor profile.out
 
 ## TODO
 
-- there still seems to be a bug (see `tests/solving.cc`)
-- implement pivoting more efficiently
+- the tableaux stores value which are all equal to one - this is unnecessary
 - propagate atoms (via the corresponding bounds of integer variables)
