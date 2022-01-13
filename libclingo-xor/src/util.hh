@@ -24,44 +24,44 @@ inline unsigned uabs(int a) {
     return -static_cast<unsigned>(a);
 }
 
-// Number class implementing arithmetic operations modulo 2
-class Number {
+// Boolean value with XOR operation and equality comparison.
+class Value {
 public:
-    Number() = default;
+    Value() = default;
 
-    Number(int num)
+    Value(int num)
     : num_{static_cast<uint8_t>(uabs(num) % 2U)} {
     }
 
-    friend Number operator+(Number const &a, Number const &b) {
-        return Number(a.num_ ^ b.num_);
+    friend Value operator+(Value const &a, Value const &b) {
+        return Value(a.num_ ^ b.num_);
     }
-    friend Number &operator+=(Number &a, Number const &b) {
+    friend Value &operator+=(Value &a, Value const &b) {
         a.num_ ^= b.num_;
         return a;
     }
 
-    friend bool operator==(Number const &a, Number const &b) {
+    friend bool operator==(Value const &a, Value const &b) {
         return a.num_ == b.num_;
     }
-    friend bool operator!=(Number const &a, Number const &b) {
+    friend bool operator!=(Value const &a, Value const &b) {
         return a.num_ != b.num_;
     }
 
-    friend bool operator==(Number const &a, int b) {
-        return a == Number{b};
+    friend bool operator==(Value const &a, int b) {
+        return a == Value{b};
     }
-    friend bool operator!=(Number const &a, int b) {
-        return a != Number{b};
+    friend bool operator!=(Value const &a, int b) {
+        return a != Value{b};
     }
 
-    friend std::ostream &operator<<(std::ostream &out, Number const &a) {
+    friend std::ostream &operator<<(std::ostream &out, Value const &a) {
         out << static_cast<int>(a.num_);
         return out;
     }
 
 private:
-    explicit Number(uint8_t num)
+    explicit Value(uint8_t num)
     : num_{num} {
     }
 
@@ -101,17 +101,8 @@ public:
     }
 
     //! Set value `a` at row `i` and column `j`.
-    void set(index_t i, index_t j, Number const &a) {
-        if (a == 0) {
-            if (i < rows_.size()) {
-                auto &row = rows_[i];
-                auto it = std::lower_bound(row.begin(), row.end(), j);
-                if (it != row.end() && *it == j) {
-                    row.erase(it);
-                }
-            }
-        }
-        else {
+    void set(index_t i, index_t j, bool a) {
+        if (a) {
             auto &row = reserve_row_(i);
             auto it = std::lower_bound(row.begin(), row.end(), j);
             if (it == row.end() || *it != j) {
@@ -123,11 +114,18 @@ public:
                 col.emplace(jt, i);
             }
         }
+        else {
+            if (i < rows_.size()) {
+                auto &row = rows_[i];
+                auto it = std::lower_bound(row.begin(), row.end(), j);
+                if (it != row.end() && *it == j) {
+                    row.erase(it);
+                }
+            }
+        }
     }
 
     //! Traverse non-zero elements in a row.
-    //!
-    //! The given function must not set the value to zero.
     template <typename F>
     void update_row(index_t i, F &&f) {
         if (i < rows_.size()) {
@@ -138,8 +136,6 @@ public:
     }
 
     //! Traverse non-zero elements in a column.
-    //!
-    //! The given function must not set the value to zero.
     template <typename F>
     void update_col(index_t j, F &&f) {
         if (j < cols_.size()) {

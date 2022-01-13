@@ -8,8 +8,6 @@
 #include <map>
 #include <optional>
 
-using Value = Number;
-using Factor = Number;
 using SymbolMap = std::unordered_map<Clingo::Symbol, index_t>;
 using SymbolVec = std::vector<Clingo::Symbol>;
 
@@ -41,18 +39,18 @@ private:
         //! Check if the variable has an upper bound.
         [[nodiscard]] bool has_bound() const { return bound != nullptr; }
         //! Set a new value or add to the existing one.
-        void set_value(Solver &s, index_t level, Value const &num, bool add);
+        void set_value(Solver &s, index_t level, Value num, bool add);
 
         //! The bound of a variable.
         Bound const *bound{nullptr};
-        //! The current value of the variable.
-        Value value{0};
         //! Helper index for pivoting variables.
         index_t index{0};
         //! Helper index to obtain row/column index of a variable.
         index_t reserve_index{0};
         //! The level the variable was assigned on.
         index_t level{0};
+        //! The current value of the variable.
+        Value value{0};
         //! Whether this variales is in the queue of conflicting variables.
         bool queued{false};
     };
@@ -108,7 +106,7 @@ private:
     void update_(index_t level, index_t j, Value v);
 
     //! Pivots basic variable `x_i` and non-basic variable `x_j`.
-    void pivot_(index_t level, index_t i, index_t j, Value const &v);
+    void pivot_(index_t level, index_t i, index_t j, Value v);
 
     //! Helper function to select pivot point.
     [[nodiscard]] bool select_(Variable const &x);

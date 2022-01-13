@@ -5,7 +5,7 @@
 
 struct Inequality {
     std::vector<Clingo::Symbol> lhs;
-    Number rhs;
+    Value rhs;
     Clingo::literal_t lit;
 };
 

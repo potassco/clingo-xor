@@ -11,22 +11,22 @@ TEST_CASE("util") {
         REQUIRE(!t.contains(0, 0));
 
         // set 1 at (0,0)
-        t.set(0, 0, 1);
+        t.set(0, 0, true);
         REQUIRE(t.size() == 1);
         REQUIRE(t.contains(0, 0));
 
         // set 1 at (0,0)
-        t.set(0, 0, 1);
+        t.set(0, 0, true);
         REQUIRE(t.size() == 1);
         REQUIRE(t.contains(0, 0));
 
         // remove at (0,0)
-        t.set(0, 0, 0);
+        t.set(0, 0, false);
         REQUIRE(!t.contains(0, 0));
         REQUIRE(t.empty());
 
         // set 1 at (0,2)
-        t.set(0, 2, 1);
+        t.set(0, 2, true);
         REQUIRE(t.size() == 1);
 
         // traverse the first row

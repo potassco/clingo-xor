@@ -109,7 +109,7 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<I
                 seen[lits] += 1;
             }
             // build inequalities
-            Number rhs{even ? 0 : 1};
+            Value rhs{even ? 0 : 1};
             std::vector<Clingo::Symbol> lhs;
             for (auto &&lits : elems) {
                 auto it = seen.find(lits);

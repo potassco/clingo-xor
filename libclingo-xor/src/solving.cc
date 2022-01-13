@@ -29,12 +29,12 @@ struct Solver::Prepare {
         return slv.n_basic_++;
     }
 
-    std::vector<std::pair<index_t, Number>> add_row(Inequality const &x) {
-        std::vector<std::pair<index_t, Number>> row;
+    std::vector<index_t> add_row(Inequality const &x) {
+        std::vector<index_t> row;
 
         // add non-basic variables
         for (auto const &term : x.lhs) {
-            row.emplace_back(get_non_basic(term), 1);
+            row.emplace_back(get_non_basic(term));
         }
 
         return row;
@@ -53,7 +53,7 @@ bool Solver::Variable::update_bound(Solver &s, Clingo::Assignment ass, Bound con
     return this->bound->value == bound.value;
 }
 
-void Solver::Variable::set_value(Solver &s, index_t lvl, Value const &val, bool add) {
+void Solver::Variable::set_value(Solver &s, index_t lvl, Value val, bool add) {
     // We can always assume that the assignment on a previous level was satisfying.
     // Thus, we simply store the old values to be able to restore them when backtracking.
     if (lvl != level) {
@@ -126,10 +126,10 @@ bool Solver::prepare(Clingo::PropagateInit &init, SymbolMap const &symbols) {
         }
         // add a bound to a non-basic variable
         else if (row.size() == 1) {
-            auto const &[j, v] = row.front();
+            auto j = row.front();
             auto &xj = non_basic_(j);
             bounds_.emplace(x.lit, Bound{
-                Factor{x.rhs},
+                Value{x.rhs},
                 variables_[j].index,
                 x.lit});
         }
@@ -137,11 +137,11 @@ bool Solver::prepare(Clingo::PropagateInit &init, SymbolMap const &symbols) {
         else {
             auto i = prep.add_basic();
             bounds_.emplace(x.lit, Bound{
-                Factor{x.rhs},
+                Value{x.rhs},
                 static_cast<index_t>(variables_.size() - 1),
                 x.lit});
-            for (auto const &[j, v] : row) {
-                tableau_.set(i, j, v);
+            for (auto j : row) {
+                tableau_.set(i, j, true);
             }
         }
     }
@@ -310,7 +310,7 @@ void Solver::update_(index_t level, index_t j, Value v) {
     xj.set_value(*this, level, v, false);
 }
 
-void Solver::pivot_(index_t level, index_t i, index_t j, Value const &v) {
+void Solver::pivot_(index_t level, index_t i, index_t j, Value v) {
     auto &xi = basic_(i);
     auto &xj = non_basic_(j);
 

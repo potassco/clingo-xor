@@ -66,5 +66,6 @@ google-pprof --gv ./build/clingo-xor profile.out
 ## TODO
 
 - propagate atoms
-  - we can maintain a counter for each row that stores how many variabless in the row do not have bounds
+  - **we can maintain a counter for each row that stores how many variabless in the row do not have bounds**
   - if this counter reaches 1, the remaining variable can be propagated
+- values could be packed better because they only need one bit (this is probably not worth the effort)
