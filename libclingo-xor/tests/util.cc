@@ -8,21 +8,21 @@ TEST_CASE("util") {
 
         // check default value 0 at (0,0)
         REQUIRE(t.empty());
-        REQUIRE(t.get(0, 0) == 0);
+        REQUIRE(!t.contains(0, 0));
 
         // set 1 at (0,0)
         t.set(0, 0, 1);
         REQUIRE(t.size() == 1);
-        REQUIRE(t.get(0, 0) == 1);
+        REQUIRE(t.contains(0, 0));
 
         // set 1 at (0,0)
         t.set(0, 0, 1);
         REQUIRE(t.size() == 1);
-        REQUIRE(t.get(0, 0) == 1);
+        REQUIRE(t.contains(0, 0));
 
         // remove at (0,0)
         t.set(0, 0, 0);
-        REQUIRE(t.get(0, 0) == 0);
+        REQUIRE(!t.contains(0, 0));
         REQUIRE(t.empty());
 
         // set 1 at (0,2)
