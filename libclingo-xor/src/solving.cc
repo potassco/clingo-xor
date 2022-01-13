@@ -34,7 +34,7 @@ struct Solver::Prepare {
 
         // add non-basic variables
         for (auto const &term : x.lhs) {
-            row.emplace_back(get_non_basic(term.var), term.co);
+            row.emplace_back(get_non_basic(term), 1);
         }
 
         return row;
@@ -107,17 +107,6 @@ Value Solver::get_value(index_t i) const {
 }
 
 bool Solver::prepare(Clingo::PropagateInit &init, SymbolMap const &symbols) {
-    // TODO: Bounds associated with a variable form a propagation chain. We can
-    // add binary clauses to propagate them. For example
-    //
-    //     `x >= u` implies not `x <= l` for all `l < u`.
-    //
-    // Care has to be taken because we cannot use
-    //
-    //     `x >= u` implies `x >= u'` for all u' >= u
-    //
-    // because I am going for a non-strict defined semantics.
-
     auto ass = init.assignment();
 
     Prepare prep{*this, symbols};
@@ -407,29 +396,14 @@ void Propagator::init(Clingo::PropagateInit &init) {
         init.set_check_mode(Clingo::PropagatorCheckMode::Partial);
     }
 
-    std::unordered_map<Clingo::Symbol, Term&> cos;
     evaluate_theory(init, aux_map_, iqs_);
     for (auto &x : iqs_) {
-        auto ib = x.lhs.begin();
-        auto ie = x.lhs.end();
-
-        // combine cofficients
-        std::for_each(ib, ie, [&cos, this](Term &term) {
-            if (var_map_.emplace(term.var, var_map_.size()).second) {
-                var_vec_.emplace_back(term.var);
+        // add variables
+        for (auto const &var : x.lhs) {
+            if (var_map_.emplace(var, var_map_.size()).second) {
+                var_vec_.emplace_back(var);
             }
-            if (auto [jt, res] = cos.emplace(term.var, term); !res) {
-                jt->second.co += term.co;
-                term.co = 0;
-            }
-        });
-        cos.clear();
-
-        // remove terms with zero coeffcients
-        x.lhs.erase(std::remove_if(ib, ie, [](Term const &term) {
-            return term.co == 0;
-        }), ie);
-
+        }
         // add watch
         init.add_watch(x.lit);
     }

@@ -110,7 +110,7 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<I
             }
             // build inequalities
             Number rhs{even ? 0 : 1};
-            std::vector<Term> lhs;
+            std::vector<Clingo::Symbol> lhs;
             for (auto &&lits : elems) {
                 auto it = seen.find(lits);
                 if (it->second % 2 == 0) {
@@ -138,10 +138,10 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<I
                     }
                     auto res = var_map.try_emplace(eq_lit, Clingo::Number(var_map.size()));
                     if (res.second) {
-                        iqs.emplace_back(Inequality{{{1, res.first->second}}, 0, -eq_lit});
-                        iqs.emplace_back(Inequality{{{1, res.first->second}}, 1, eq_lit});
+                        iqs.emplace_back(Inequality{{res.first->second}, 0, -eq_lit});
+                        iqs.emplace_back(Inequality{{res.first->second}, 1, eq_lit});
                     }
-                    lhs.emplace_back(Term{1, res.first->second});
+                    lhs.emplace_back(res.first->second);
                 }
             }
             auto lit = init.solver_literal(atom.literal());

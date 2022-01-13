@@ -65,5 +65,6 @@ google-pprof --gv ./build/clingo-xor profile.out
 
 ## TODO
 
-- the tableaux stores value which are all equal to one - this is unnecessary
-- propagate atoms (via the corresponding bounds of integer variables)
+- propagate atoms
+  - we can maintain a counter for each row that stores how many variabless in the row do not have bounds
+  - if this counter reaches 1, the remaining variable can be propagated
