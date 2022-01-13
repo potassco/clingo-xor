@@ -3,7 +3,7 @@
 
 #include <unordered_set>
 
-typename Solver::BoundRelation bound_rel(Relation rel) {
+Solver::BoundRelation bound_rel(Relation rel) {
     switch (rel) {
         case Relation::Less:
         case Relation::LessEqual: {
@@ -140,7 +140,7 @@ Solver::Variable &Solver::basic_(index_t i) {
     return variables_[variables_[i + n_non_basic_].index];
 }
 
-typename Solver::Variable &Solver::non_basic_(index_t j) {
+Solver::Variable &Solver::non_basic_(index_t j) {
     assert(j < n_non_basic_);
     return variables_[variables_[j].index];
 }
@@ -223,7 +223,7 @@ bool Solver::prepare(Clingo::PropagateInit &init, SymbolMap const &symbols) {
             auto &xj = non_basic_(j);
             auto rel = v < 0 ? invert(x.rel) : x.rel;
             bounds_.emplace(x.lit, Bound{
-                bound_val(Factor{x.rhs / v}, rel),
+                bound_val(Factor{x.rhs}, rel),
                 variables_[j].index,
                 x.lit,
                 bound_rel(rel)});
@@ -376,8 +376,8 @@ Statistics const &Solver::statistics() const {
 bool Solver::check_tableau_() {
     for (index_t i{0}; i < n_basic_; ++i) {
         Value v_i;
-        tableau_.update_row(i, [&](index_t j, Number const &a_ij){
-            v_i += non_basic_(j).value * a_ij;
+        tableau_.update_row(i, [&](index_t j){
+            v_i += non_basic_(j).value;
         });
         if (v_i != basic_(i).value) {
             return false;
@@ -426,8 +426,8 @@ bool Solver::check_solution(bool trace) {
 
 void Solver::update_(index_t level, index_t j, Value v) {
     auto &xj = non_basic_(j);
-    tableau_.update_col(j, [&](index_t i, Number const &a_ij) {
-        basic_(i).set_value(*this, level, a_ij * (v - xj.value), true);
+    tableau_.update_col(j, [&](index_t i) {
+        basic_(i).set_value(*this, level, v + xj.value, true);
         enqueue_(i);
     });
     xj.set_value(*this, level, v, false);
@@ -441,14 +441,11 @@ void Solver::pivot_(index_t level, index_t i, index_t j, Value const &v) {
     auto &xj = non_basic_(j);
 
     // adjust assignment
-    Value dj = (v - xi.value) / a_ij;
-    assert(dj != 0);
     xi.set_value(*this, level, v, false);
-    xj.set_value(*this, level, dj, true);
-    // TODO: can this be merged into the loop below?:
-    tableau_.update_col(j, [&](index_t k, Number const &a_kj) {
+    xj.set_value(*this, level, 1, true);
+    tableau_.update_col(j, [&](index_t k) {
         if (k != i) {
-            basic_(k).set_value(*this, level, a_kj * dj, true);
+            basic_(k).set_value(*this, level, 1, true);
             enqueue_(k);
         }
     });
@@ -458,14 +455,6 @@ void Solver::pivot_(index_t level, index_t i, index_t j, Value const &v) {
     std::swap(xi.reserve_index, xj.reserve_index);
     std::swap(variables_[i + n_non_basic_].index, variables_[j].index);
     enqueue_(i);
-
-    // invert row i
-    tableau_.update_row(i, [&](index_t k, Number &a_ik) {
-        if (k != j) {
-            a_ik /= -a_ij;
-        }
-    });
-    a_ij = 1 / a_ij;
 
     // eliminate x_j from rows k != i
     tableau_.eliminate(i, j);
@@ -489,7 +478,7 @@ bool Solver::select_(Variable &x) {
     return false;
 }
 
-typename Solver::State Solver::select_(index_t &ret_i, index_t &ret_j, Value const *&ret_v) {
+Solver::State Solver::select_(index_t &ret_i, index_t &ret_j, Value const *&ret_v) {
     // This implements Bland's rule selecting the variables with the smallest
     // indices for pivoting.
 
@@ -509,7 +498,7 @@ typename Solver::State Solver::select_(index_t &ret_i, index_t &ret_j, Value con
             conflict_clause_.clear();
             conflict_clause_.emplace_back(-xi.lower_bound->lit);
             index_t kk = variables_.size();
-            tableau_.update_row(i, [&](index_t j, Number const &a_ij) {
+            tableau_.update_row(i, [&](index_t j) {
                 auto jj = variables_[j].index;
                 if (jj < kk && select_(variables_[jj])) {
                     kk = jj;
@@ -528,7 +517,7 @@ typename Solver::State Solver::select_(index_t &ret_i, index_t &ret_j, Value con
             conflict_clause_.clear();
             conflict_clause_.emplace_back(-xi.upper_bound->lit);
             index_t kk = variables_.size();
-            tableau_.update_row(i, [&](index_t j, Number const &a_ij) {
+            tableau_.update_row(i, [&](index_t j) {
                 auto jj = variables_[j].index;
                 if (jj < kk && select_(variables_[jj])) {
                     kk = jj;

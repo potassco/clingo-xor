@@ -30,21 +30,19 @@ TEST_CASE("util") {
         REQUIRE(t.size() == 1);
 
         // traverse the first row
-        t.update_row(0, [](index_t j, Number &a) {
+        t.update_row(0, [](index_t j) {
             REQUIRE(j == 2);
-            REQUIRE(a == 1);
         });
         REQUIRE(t.size() == 1);
 
         // traverse the third column
-        t.update_col(2, [](index_t i, Number &a) {
+        t.update_col(2, [](index_t i) {
             REQUIRE(i == 0);
-            REQUIRE(a == 1);
         });
         REQUIRE(t.size() == 1);
 
         // traverse the first column
-        t.update_col(0, [](index_t j, Number &a) { });
+        t.update_col(0, [](index_t j) { });
         REQUIRE(t.size() == 1);
     }
 };

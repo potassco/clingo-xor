@@ -37,45 +37,12 @@ public:
         std::swap(num_, x.num_);
     }
 
-    void canonicalize() {
-    }
-
-    friend Number operator*(Number const &a, Number const &b) {
-        return Number(a.num_ * b.num_);
-    }
-
-    friend Number &operator*=(Number &a, Number const &b) {
-        a.num_ *= b.num_;
-        return a;
-    }
-
-    friend Number operator/(Number const &a, Number const &b) {
-        assert(b.num_ != 0);
-        return Number(a.num_ / b.num_);
-    }
-
-    friend Number &operator/=(Number &a, Number const &b) {
-        assert(b.num_ != 0);
-        a.num_ /= b.num_;
-        return a;
-    }
-
     friend Number operator+(Number const &a, Number const &b) {
         return Number(a.num_ ^ b.num_);
     }
     friend Number &operator+=(Number &a, Number const &b) {
         a.num_ ^= b.num_;
         return a;
-    }
-
-    friend Number operator-(Number const &a) {
-        return a;
-    }
-    friend Number operator-(Number const &a, Number const &b) {
-        return a + b;
-    }
-    friend Number &operator-=(Number &a, Number const &b) {
-        return a += b;
     }
 
     friend bool operator<(Number const &a, Number const &b) {
@@ -239,7 +206,7 @@ public:
     void update_row(index_t i, F &&f) {
         if (i < rows_.size()) {
             for (auto &[col, val] : rows_[i]) {
-                f(col, val);
+                f(col);
             }
         }
     }
@@ -258,7 +225,7 @@ public:
                 auto &row = rows_[i];
                 auto kt = std::lower_bound(row.begin(), row.end(), j);
                 if (kt != row.end() && kt->col == j) {
-                    f(i, kt->val);
+                    f(i);
                     if (it != jt) {
                         std::iter_swap(it, jt);
                     }
@@ -278,14 +245,14 @@ public:
         auto ib = rows_[i].begin();
         auto ie = rows_[i].end();
         std::vector<Cell> row;
-        update_col(j, [&](index_t k, Number const &a_kj) {
+        update_col(j, [&](index_t k) {
             if (k != i) {
                 // Note that this call does not invalidate active iterators:
                 // - row i is unaffected because k != i
                 // - there are no insertions in column j because each a_kj != 0
                 for (auto it = ib, jt = rows_[k].begin(), je = rows_[k].end(); it != ie || jt != je; ) {
                     if (jt == je || (it != ie && it->col < jt->col)) {
-                        row.emplace_back(it->col, it->val * a_kj);
+                        row.emplace_back(it->col, it->val);
                         auto &col = cols_[it->col];
                         auto kt = std::lower_bound(col.begin(), col.end(), k);
                         if (kt == col.end() || *kt != k) {
@@ -294,19 +261,19 @@ public:
                         ++it;
                     }
                     else if (it == ie || jt->col < it->col) {
-                        row.emplace_back(std::move(*jt));
+                        row.emplace_back(*jt);
                         ++jt;
                     }
                     else {
                         if (jt->col != j) {
-                            row.emplace_back(jt->col, std::move(jt->val));
-                            row.back().val += it->val * a_kj;
+                            row.emplace_back(jt->col, jt->val);
+                            row.back().val += it->val;
                             if (row.back().val == 0) {
                                 row.pop_back();
                             }
                         }
                         else {
-                            row.emplace_back(jt->col, jt->val * it->val);
+                            row.emplace_back(jt->col, 1);
                         }
                         ++it;
                         ++jt;
