@@ -3,28 +3,6 @@
 
 #include <unordered_set>
 
-Solver::BoundRelation bound_rel(Relation rel) {
-    switch (rel) {
-        case Relation::Less:
-        case Relation::LessEqual: {
-            return Solver::BoundRelation::LessEqual;
-        }
-        case Relation::Greater:
-        case Relation::GreaterEqual: {
-            return Solver::BoundRelation::GreaterEqual;
-        }
-        case Relation::Equal: {
-            break;
-        }
-    }
-    return Solver::BoundRelation::Equal;
-}
-
-Number bound_val(Number x, Relation rel) {
-    assert(rel != Relation::Less && rel != Relation::Greater);
-    return x;
-}
-
 struct Solver::Prepare {
     Prepare(Solver &slv, SymbolMap const &map)
     : slv{slv}
@@ -67,51 +45,20 @@ struct Solver::Prepare {
     std::vector<index_t> basic;
 };
 
-bool Solver::Variable::update_upper(Solver &s, Clingo::Assignment ass, Bound const &bound) {
-    if (!has_upper() || bound.value < upper()) {
-        if (!has_upper() || ass.level(upper_bound->lit) < ass.decision_level()) {
-            s.bound_trail_.emplace_back(bound.variable, BoundRelation::LessEqual, upper_bound);
-        }
-        upper_bound = &bound;
+bool Solver::Variable::update_bound(Solver &s, Clingo::Assignment ass, Bound const &bound) {
+    if (!has_bound()) {
+        s.bound_trail_.emplace_back(bound.variable);
+        this->bound = &bound;
     }
-    return !has_lower() || lower() <= upper();
-}
-
-bool Solver::Variable::update_lower(Solver &s, Clingo::Assignment ass, Bound const &bound) {
-    if (!has_lower() || bound.value > lower()) {
-        if (!has_lower() || ass.level(lower_bound->lit) < ass.decision_level()) {
-            if (upper_bound != &bound) {
-                s.bound_trail_.emplace_back(bound.variable, BoundRelation::GreaterEqual, lower_bound);
-            }
-            else {
-                // Note: this assumes that update_lower is called right after update_upper for the same bound
-                std::get<1>(s.bound_trail_.back()) = BoundRelation::Equal;
-            }
-        }
-        lower_bound = &bound;
-    }
-    return !has_upper() || lower() <= upper();
-}
-
-bool Solver::Variable::update(Solver &s, Clingo::Assignment ass, Bound const &bound) {
-    switch (bound.rel) {
-        case BoundRelation::LessEqual: {
-            return update_upper(s, ass, bound);
-        }
-        case BoundRelation::GreaterEqual: {
-            return update_lower(s, ass, bound);
-        }
-        case BoundRelation::Equal: {
-            break;
-        }
-    }
-    return update_upper(s, ass, bound) && update_lower(s, ass, bound);
+    return this->bound->value == bound.value;
 }
 
 void Solver::Variable::set_value(Solver &s, index_t lvl, Value const &val, bool add) {
     // We can always assume that the assignment on a previous level was satisfying.
     // Thus, we simply store the old values to be able to restore them when backtracking.
     if (lvl != level) {
+        // This assumes that the variable is contained in the variables_ vector
+        // of the solver.
         s.assignment_trail_.emplace_back(level, this - s.variables_.data(), value);
         level = lvl;
     }
@@ -124,7 +71,7 @@ void Solver::Variable::set_value(Solver &s, index_t lvl, Value const &val, bool 
 }
 
 bool Solver::Variable::has_conflict() const {
-    return (has_lower() && value < lower()) || (has_upper() && value > upper());
+    return has_bound() && value != bound->value;
 }
 
 void Statistics::reset() {
@@ -184,58 +131,26 @@ bool Solver::prepare(Clingo::PropagateInit &init, SymbolMap const &symbols) {
 
         // check bound against 0
         if (row.empty()) {
-            switch (x.rel) {
-                case Relation::Less: {
-                    if (x.rhs >= 0 && !init.add_clause({-x.lit})) {
-                        return false;
-                    }
-                    break;
-                }
-                case Relation::LessEqual: {
-                    if (x.rhs > 0 && !init.add_clause({-x.lit})) {
-                        return false;
-                    }
-                    break;
-                }
-                case Relation::Greater: {
-                    if (x.rhs <= 0 && !init.add_clause({-x.lit})) {
-                        return false;
-                    }
-                    break;
-                }
-                case Relation::GreaterEqual: {
-                    if (x.rhs < 0 && !init.add_clause({-x.lit})) {
-                        return false;
-                    }
-                    break;
-                }
-                case Relation::Equal: {
-                    if (x.rhs != 0 && !init.add_clause({-x.lit})) {
-                        return false;
-                    }
-                    break;
-                }
+            if (x.rhs != 0 && !init.add_clause({-x.lit})) {
+                return false;
             }
         }
         // add a bound to a non-basic variable
         else if (row.size() == 1) {
             auto const &[j, v] = row.front();
             auto &xj = non_basic_(j);
-            auto rel = v < 0 ? invert(x.rel) : x.rel;
             bounds_.emplace(x.lit, Bound{
-                bound_val(Factor{x.rhs}, rel),
+                Factor{x.rhs},
                 variables_[j].index,
-                x.lit,
-                bound_rel(rel)});
+                x.lit});
         }
         // add an inequality
         else {
             auto i = prep.add_basic();
             bounds_.emplace(x.lit, Bound{
-                bound_val(Factor{x.rhs}, x.rel),
+                Factor{x.rhs},
                 static_cast<index_t>(variables_.size() - 1),
-                x.lit,
-                bound_rel(x.rel)});
+                x.lit});
             for (auto const &[j, v] : row) {
                 tableau_.set(i, j, v);
             }
@@ -272,18 +187,15 @@ bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
         for (auto it = bounds_.find(lit), ie = bounds_.end(); it != ie && it->first == lit; ++it) {
             auto const &[lit, bound] = *it;
             auto &x = variables_[bound.variable];
-            if (!x.update(*this, ctl.assignment(), bound)) {
+            if (!x.update_bound(*this, ctl.assignment(), bound)) {
                 conflict_clause_.clear();
-                conflict_clause_.emplace_back(-x.upper_bound->lit);
-                conflict_clause_.emplace_back(-x.lower_bound->lit);
+                conflict_clause_.emplace_back(-bound.lit);
+                conflict_clause_.emplace_back(-x.bound->lit);
                 return false;
             }
             if (x.reserve_index < n_non_basic_) {
-                if (x.has_lower() && x.value < x.lower()) {
-                    update_(level, x.reserve_index, x.lower());
-                }
-                else if (x.has_upper() && x.value > x.upper()) {
-                    update_(level, x.reserve_index, x.upper());
+                if (x.has_bound() && x.value != x.bound->value) {
+                    update_(level, x.reserve_index, x.bound->value);
                 }
             }
             else {
@@ -332,22 +244,7 @@ void Solver::undo() {
 
     // undo bound updates
     for (auto it = bound_trail_.begin() + offset.bound, ie = bound_trail_.end(); it != ie; ++it) {
-        auto [var, rel, bound] = *it;
-        switch (rel) {
-            case BoundRelation::LessEqual: {
-                variables_[var].upper_bound = bound;
-                break;
-            }
-            case BoundRelation::GreaterEqual: {
-                variables_[var].lower_bound = bound;
-                break;
-            }
-            case BoundRelation::Equal: {
-                variables_[var].upper_bound = bound;
-                variables_[var].lower_bound = bound;
-                break;
-            }
-        }
+        variables_[*it].bound = nullptr;
     }
     bound_trail_.resize(offset.bound);
 
@@ -355,7 +252,7 @@ void Solver::undo() {
     for (auto it = assignment_trail_.begin() + offset.assignment, ie = assignment_trail_.end(); it != ie; ++it) {
         auto &[level, index, number] = *it;
         variables_[index].level = level;
-        variables_[index].value.swap(number);
+        variables_[index].value = number;
     }
     assignment_trail_.resize(offset.assignment);
 
@@ -389,10 +286,7 @@ bool Solver::check_tableau_() {
 bool Solver::check_basic_() {
     for (index_t i = 0; i < n_basic_; ++i) {
         auto &xi = basic_(i);
-        if (xi.has_lower() && xi.value < xi.lower() && !xi.queued) {
-            return false;
-        }
-        if (xi.has_upper() && xi.value > xi.upper() && !xi.queued) {
+        if (xi.has_bound() && xi.value != xi.bound->value && !xi.queued) {
             return false;
         }
     }
@@ -402,10 +296,7 @@ bool Solver::check_basic_() {
 bool Solver::check_non_basic_() {
     for (index_t j = 0; j < n_non_basic_; ++j) {
         auto &xj = non_basic_(j);
-        if (xj.has_lower() && xj.value < xj.lower()) {
-            return false;
-        }
-        if (xj.has_upper() && xj.value > xj.upper()) {
+        if (xj.has_bound() && xj.value != xj.bound->value) {
             return false;
         }
     }
@@ -414,10 +305,7 @@ bool Solver::check_non_basic_() {
 
 bool Solver::check_solution(bool trace) {
     for (auto &x : variables_) {
-        if (x.has_lower() && x.lower() > x.value) {
-            return false;
-        }
-        if (x.has_upper() && x.value > x.upper()) {
+        if (x.has_bound() && x.bound->value != x.value) {
             return false;
         }
     }
@@ -434,9 +322,6 @@ void Solver::update_(index_t level, index_t j, Value v) {
 }
 
 void Solver::pivot_(index_t level, index_t i, index_t j, Value const &v) {
-    auto &a_ij = tableau_.unsafe_get(i, j);
-    assert(a_ij != 0);
-
     auto &xi = basic_(i);
     auto &xj = non_basic_(j);
 
@@ -465,15 +350,12 @@ void Solver::pivot_(index_t level, index_t i, index_t j, Value const &v) {
     assert_extra(check_non_basic_());
 }
 
-bool Solver::select_(Variable &x) {
-    if ((!x.has_upper() || x.value < x.upper()) && (!x.has_lower() || x.value > x.lower())) {
+bool Solver::select_(Variable const &x) {
+    if (!x.has_bound() || x.value != x.bound->value) {
         return true;
     }
-    if (x.has_upper()) {
-        conflict_clause_.emplace_back(-x.upper_bound->lit);
-    }
-    if (x.has_lower()) {
-        conflict_clause_.emplace_back(-x.lower_bound->lit);
+    if (x.has_bound()) {
+        conflict_clause_.emplace_back(-x.bound->lit);
     }
     return false;
 }
@@ -494,9 +376,9 @@ Solver::State Solver::select_(index_t &ret_i, index_t &ret_j, Value const *&ret_
         }
         i -= n_non_basic_;
 
-        if (xi.has_lower() && xi.value < xi.lower()) {
+        if (xi.has_bound() && xi.value != xi.bound->value) {
             conflict_clause_.clear();
-            conflict_clause_.emplace_back(-xi.lower_bound->lit);
+            conflict_clause_.emplace_back(-xi.bound->lit);
             index_t kk = variables_.size();
             tableau_.update_row(i, [&](index_t j) {
                 auto jj = variables_[j].index;
@@ -504,26 +386,7 @@ Solver::State Solver::select_(index_t &ret_i, index_t &ret_j, Value const *&ret_
                     kk = jj;
                     ret_i = i;
                     ret_j = j;
-                    ret_v = &xi.lower();
-                }
-            });
-            if (kk == variables_.size()) {
-                return State::Unsatisfiable;
-            }
-            return State::Unknown;
-        }
-
-        if (xi.has_upper() && xi.value > xi.upper()) {
-            conflict_clause_.clear();
-            conflict_clause_.emplace_back(-xi.upper_bound->lit);
-            index_t kk = variables_.size();
-            tableau_.update_row(i, [&](index_t j) {
-                auto jj = variables_[j].index;
-                if (jj < kk && select_(variables_[jj])) {
-                    kk = jj;
-                    ret_i = i;
-                    ret_j = j;
-                    ret_v = &xi.upper();
+                    ret_v = &xi.bound->value;
                 }
             });
             if (kk == variables_.size()) {

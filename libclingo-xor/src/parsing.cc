@@ -138,20 +138,15 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<I
                     }
                     auto res = var_map.try_emplace(eq_lit, Clingo::Number(var_map.size()));
                     if (res.second) {
-                        // FIXME: LessEqual and GreaterEqual should be usable
-                        // but this leads to a bug with multi-shot solving
-                        iqs.emplace_back(Inequality{{{1, res.first->second}}, 0, Relation::Equal, -eq_lit});
-                        iqs.emplace_back(Inequality{{{1, res.first->second}}, 1, Relation::Equal, eq_lit});
+                        iqs.emplace_back(Inequality{{{1, res.first->second}}, 0, -eq_lit});
+                        iqs.emplace_back(Inequality{{{1, res.first->second}}, 1, eq_lit});
                     }
                     lhs.emplace_back(Term{1, res.first->second});
                 }
             }
             auto lit = init.solver_literal(atom.literal());
-            // FIXME: LessEqual and GreaterEqual should be usable
-            // but this leads to a bug with multi-shot solving
             iqs.emplace_back(Inequality{std::move(lhs),
                                         rhs,
-                                        Relation::Equal,
                                         lit});
         }
     }

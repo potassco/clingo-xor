@@ -33,10 +33,6 @@ public:
     : num_{static_cast<uint8_t>(uabs(num) % 2U)} {
     }
 
-    void swap(Number &x) {
-        std::swap(num_, x.num_);
-    }
-
     friend Number operator+(Number const &a, Number const &b) {
         return Number(a.num_ ^ b.num_);
     }
@@ -45,18 +41,6 @@ public:
         return a;
     }
 
-    friend bool operator<(Number const &a, Number const &b) {
-        return a.num_ < b.num_;
-    }
-    friend bool operator<=(Number const &a, Number const &b) {
-        return a.num_ <= b.num_;
-    }
-    friend bool operator>(Number const &a, Number const &b) {
-        return a.num_ > b.num_;
-    }
-    friend bool operator>=(Number const &a, Number const &b) {
-        return a.num_ >= b.num_;
-    }
     friend bool operator==(Number const &a, Number const &b) {
         return a.num_ == b.num_;
     }
@@ -64,27 +48,11 @@ public:
         return a.num_ != b.num_;
     }
 
-    friend bool operator<(Number const &a, int b) {
-        return a < Number{b};
-    }
-    friend bool operator<=(Number const &a, int b) {
-        return a <= Number{b};
-    }
-    friend bool operator>(Number const &a, int b) {
-        return a > Number{b};
-    }
-    friend bool operator>=(Number const &a, int b) {
-        return a >= Number{b};
-    }
     friend bool operator==(Number const &a, int b) {
         return a == Number{b};
     }
     friend bool operator!=(Number const &a, int b) {
         return a != Number{b};
-    }
-
-    friend int compare(Number const &a, Number const &b) {
-        return (int)a.num_ - (int)b.num_;
     }
 
     friend std::ostream &operator<<(std::ostream &out, Number const &a) {

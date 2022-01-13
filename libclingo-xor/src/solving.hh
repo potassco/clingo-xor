@@ -24,18 +24,6 @@ class Solver {
 private:
     //! Helper class to prepare the inequalities for solving.
     struct Prepare;
-    //! The bound type.
-    enum class BoundType : uint32_t {
-        Lower = 0,
-        Upper = 1,
-        //Equal = 2,
-    };
-    enum class BoundRelation : uint32_t  {
-        LessEqual = 0,
-        GreaterEqual = 1,
-        Equal = 2,
-    };
-    friend BoundRelation bound_rel(Relation rel);
     //! The bounds associated with a Variable.
     //!
     //! In practice, there should be a lot of variables with just one bound.
@@ -43,34 +31,21 @@ private:
         Value value;
         index_t variable{0};
         Clingo::literal_t lit{0};
-        BoundRelation rel{BoundRelation::LessEqual};
     };
     //! Capture the current state of a variable.
     struct Variable {
-        //! Adjusts the lower bound of the variable with the value of the given bound.
-        [[nodiscard]] bool update_lower(Solver &s, Clingo::Assignment ass, Bound const &bound);
-        //! Adjusts the upper bound of the variable with the value of the given bound.
-        [[nodiscard]] bool update_upper(Solver &s, Clingo::Assignment ass, Bound const &bound);
         //! Adjusts the bounds of the variable w.r.t. to the relation of the bound.
-        [[nodiscard]] bool update(Solver &s, Clingo::Assignment ass, Bound const &bound);
+        [[nodiscard]] bool update_bound(Solver &s, Clingo::Assignment ass, Bound const &bound);
         //! Check if te value of the variable conflicts with the bounds;
         [[nodiscard]] bool has_conflict() const;
-        //! Check if the variable has a lower bound.
-        [[nodiscard]] bool has_lower() const { return lower_bound != nullptr; }
         //! Check if the variable has an upper bound.
-        [[nodiscard]] bool has_upper() const { return upper_bound != nullptr; }
-        //! Return the value of the lower bound.
-        [[nodiscard]] Value const &lower() const { return lower_bound->value; }
-        //! Return thevalue of the upper bound.
-        [[nodiscard]] Value const &upper() const { return upper_bound->value; }
+        [[nodiscard]] bool has_bound() const { return bound != nullptr; }
         //! Set a new value or add to the existing one.
         void set_value(Solver &s, index_t level, Value const &num, bool add);
 
-        //! The lower bound of a variable.
-        Bound const *lower_bound{nullptr};
-        //! The upper bound of a variable.
-        Bound const *upper_bound{nullptr};
-        //! The value of the variable.
+        //! The bound of a variable.
+        Bound const *bound{nullptr};
+        //! The current value of the variable.
         Value value{0};
         //! Helper index for pivoting variables.
         index_t index{0};
@@ -136,7 +111,7 @@ private:
     void pivot_(index_t level, index_t i, index_t j, Value const &v);
 
     //! Helper function to select pivot point.
-    [[nodiscard]] bool select_(Variable &x);
+    [[nodiscard]] bool select_(Variable const &x);
     //! Select pivot point using Bland's rule.
     State select_(index_t &ret_i, index_t &ret_j, Value const *&ret_v);
 
@@ -150,7 +125,7 @@ private:
     //! Mapping from literals to bounds.
     std::unordered_multimap<Clingo::literal_t, Bound> bounds_;
     //! Trail of bound assignments (variable, relation, Value).
-    std::vector<std::tuple<index_t, BoundRelation, Bound const *>> bound_trail_;
+    std::vector<index_t> bound_trail_;
     //! Trail for assignments (level, variable, Value).
     std::vector<std::tuple<index_t, index_t, Value>> assignment_trail_;
     //! Trail offsets per level.
