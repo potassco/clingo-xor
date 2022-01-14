@@ -16,56 +16,52 @@
 
 using index_t = uint32_t;
 
-
-inline constexpr unsigned uabs(int a) {
-    if (a >= 0) {
-        return static_cast<unsigned>(a);
-    }
-    return -static_cast<unsigned>(a);
-}
-
-// Boolean value with XOR operation and equality comparison.
+//! A Boolean value to be used with XOR operations and equality comparisons.
 class Value {
 public:
     constexpr Value() = default;
 
-    constexpr Value(int num)
-    : num_{static_cast<uint8_t>(uabs(num) % 2U)} {
+    explicit constexpr Value(bool value)
+    : value_{value} {
     }
 
-    friend constexpr Value operator+(Value const &a, Value const &b) {
-        return Value{a.num_ ^ b.num_};
+    //! Flip the Boolean value.
+    void constexpr flip() {
+        value_ = !value_;
     }
-    friend constexpr Value &operator+=(Value &a, Value const &b) {
-        a.num_ ^= b.num_;
+
+    //! Test if the Boolean value is true.
+    explicit constexpr operator bool() const {
+        return value_;
+    }
+
+    //! Infix XOR operation.
+    friend constexpr Value operator^(Value const &a, Value const &b) {
+        return Value{a.value_ != b.value_};
+    }
+    //! Inplace XOR assignment.
+    friend constexpr Value &operator^=(Value &a, Value const &b) {
+        a.value_ = a.value_ != b.value_;
         return a;
     }
 
+    //! Check if two Boolean values are equal.
     friend constexpr bool operator==(Value const &a, Value const &b) {
-        return a.num_ == b.num_;
+        return a.value_ == b.value_;
     }
+    //! Check if two Boolean values are inequal.
     friend constexpr bool operator!=(Value const &a, Value const &b) {
-        return a.num_ != b.num_;
+        return a.value_ != b.value_;
     }
 
-    friend constexpr bool operator==(Value const &a, int b) {
-        return a == Value{b};
-    }
-    friend constexpr bool operator!=(Value const &a, int b) {
-        return a != Value{b};
-    }
-
+    //! Print the Boolean value as an integer (0 or 1).
     friend std::ostream &operator<<(std::ostream &out, Value const &a) {
-        out << static_cast<int>(a.num_);
+        out << static_cast<int>(a.value_);
         return out;
     }
 
 private:
-    explicit constexpr Value(uint8_t num)
-    : num_{num} {
-    }
-
-    uint8_t num_{0};
+    bool value_{false};
 };
 
 //! A sparse matrix with efficient access to both rows and columns.

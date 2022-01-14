@@ -105,7 +105,7 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<X
                 seen[lits] += 1;
             }
             // build inequalities
-            Value rhs{even ? 0 : 1};
+            Value rhs{odd};
             std::vector<Clingo::Symbol> lhs;
             for (auto &&lits : elems) {
                 auto it = seen.find(lits);
@@ -114,7 +114,7 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<X
                 }
                 it->second = 0;
                 if (lits.empty()) {
-                    rhs += 1;
+                    rhs.flip();
                 }
                 else {
                     Clingo::literal_t eq_lit{0};
@@ -134,8 +134,8 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<X
                     }
                     auto res = var_map.try_emplace(eq_lit, Clingo::Number(var_map.size()));
                     if (res.second) {
-                        iqs.emplace_back(XORConstraint{{res.first->second}, 0, -eq_lit});
-                        iqs.emplace_back(XORConstraint{{res.first->second}, 1, eq_lit});
+                        iqs.emplace_back(XORConstraint{{res.first->second}, Value{false}, -eq_lit});
+                        iqs.emplace_back(XORConstraint{{res.first->second}, Value{true}, eq_lit});
                     }
                     lhs.emplace_back(res.first->second);
                 }

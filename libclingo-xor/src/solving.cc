@@ -62,7 +62,7 @@ void Solver::Variable::flip_value(Solver &s, index_t lvl) {
         s.assignment_trail_.emplace_back(level, this - s.variables_.data(), value);
         level = lvl;
     }
-    value += 1;
+    value.flip();
 }
 
 bool Solver::Variable::has_conflict() const {
@@ -115,7 +115,7 @@ bool Solver::prepare(Clingo::PropagateInit &init, SymbolMap const &symbols) {
 
         // check bound against 0
         if (row.empty()) {
-            if (x.rhs != 0 && !init.add_clause({-x.lit})) {
+            if (x.rhs && !init.add_clause({-x.lit})) {
                 return false;
             }
         }
@@ -256,7 +256,7 @@ bool Solver::check_tableau_() {
     for (index_t i{0}; i < n_basic_; ++i) {
         Value v_i;
         tableau_.update_row(i, [&](index_t j){
-            v_i += non_basic_(j).value;
+            v_i ^= non_basic_(j).value;
         });
         if (v_i != basic_(i).value) {
             return false;
