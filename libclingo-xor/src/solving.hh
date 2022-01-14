@@ -76,8 +76,7 @@ public:
 
     //! Solve the (previously prepared) problem.
     //!
-    //! If the function returns false, it sets a conflict clause, which can be
-    //! obtained calling method reason().
+    //! If the function returns false, the solver has to backtrack.
     [[nodiscard]] bool solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits);
 
     //! Undo assignments on the current level.
@@ -88,9 +87,6 @@ public:
 
     //! Return the solve statistics.
     [[nodiscard]] Statistics const &statistics() const;
-
-    //! Return the conflict clause.
-    [[nodiscard]] Clingo::LiteralSpan reason() const { return conflict_clause_; }
 
 private:
     //! Check if the tableau.

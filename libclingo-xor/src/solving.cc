@@ -174,6 +174,7 @@ bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
                 conflict_clause_.clear();
                 conflict_clause_.emplace_back(-bound.lit);
                 conflict_clause_.emplace_back(-x.bound->lit);
+                ctl.add_clause(conflict_clause_);
                 return false;
             }
             if (x.reverse_index < n_non_basic_) {
@@ -208,9 +209,68 @@ bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
                 }
                 assignment_trail_.clear();
 #endif
+                // TODO: This is just a test to see what kind of effect
+                // propagation has. So far, it seems like something that has to
+                // be implemented to reduce choices/conflicts. The following
+                // has to be implemented better via watches/counters to
+                // efficiently detect when a bound can be propagated.
+                for (index_t i = 0; i < n_basic_; ++i) {
+                    conflict_clause_.clear();
+                    size_t num_free = 0;
+                    Variable *free = nullptr;
+                    tableau_.update_row(i, [&](index_t j) {
+                        auto &xj = non_basic_(j);
+                        if (!xj.has_bound()) {
+                            num_free += 1;
+                            free = &xj;
+                        }
+                        else {
+                            conflict_clause_.emplace_back(-xj.bound->lit);
+                        }
+
+                    });
+                    auto &xi = basic_(i);
+                    if (!xi.has_bound()) {
+                        num_free += 1;
+                        free = &xi;
+                    }
+                    else {
+                        conflict_clause_.emplace_back(-xi.bound->lit);
+                    }
+                    if (num_free == 1) {
+                        auto idx = static_cast<index_t>(free - variables_.data());
+                        size_t num = 0;
+                        bool sat = false;
+                        for (auto &[lit, bound] : bounds_) {
+                            if (bound.variable == idx) {
+                                auto con = free->value == bound.value ? lit : -lit;
+                                // TODO: This case can apparently occur during
+                                // multi-shot solving on level 0. Maybe this
+                                // can be avoided so that we could rather add
+                                // an assertion.
+                                if (ctl.assignment().is_true(con)) {
+                                    sat = true;
+                                    break;
+                                }
+                                if (num > 0 && conflict_clause_.back() == con) {
+                                    continue;
+                                }
+                                conflict_clause_.emplace_back(con);
+                                ++num;
+                            }
+                        }
+                        // Note: Can this add non-unit clauses given the way
+                        // constraints are build?
+                        if (!sat && !ctl.add_clause(conflict_clause_)) {
+                            return false;
+                        }
+                    }
+                }
+
                 return true;
             }
             case State::Unsatisfiable: {
+                ctl.add_clause(conflict_clause_);
                 return false;
             }
             case State::Unknown: {
@@ -431,9 +491,7 @@ void Propagator::check(Clingo::PropagateControl &ctl) {
     auto &[offset, slv] = slvs_[ctl.thread_id()];
     if (ass.decision_level() == 0 && offset < facts_offset_) {
         if (!slv.solve(ctl, Clingo::LiteralSpan{facts_.data() + offset, facts_offset_})) { // NOLINT
-            if (!ctl.add_clause(slv.reason())) {
-                return;
-            }
+            return;
         }
         offset = facts_offset_;
     }
@@ -446,7 +504,6 @@ void Propagator::propagate(Clingo::PropagateControl &ctl, Clingo::LiteralSpan ch
     }
     auto &[offset, slv] = slvs_[ctl.thread_id()];
     if (!slv.solve(ctl, changes)) {
-        ctl.add_clause(slv.reason());
         return;
     }
 }
