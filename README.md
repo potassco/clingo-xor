@@ -9,16 +9,15 @@ version of) the simplex algorithm.
 
 ## Input
 
-The system supports `&even` and `&odd` constraints over integers in rule heads.
-The elements of the constraint are tuples with conditions where the first
-element of the tuple must be an integer.
+The system supports `&even` and `&odd` constraints over sets of tuples in rule
+heads. The elements of the constraint are tuples with conditions.
 
 The following program corresponds to `p(1) xor p(2) xor p(3)`:
 
 ```
 { p(1..3) }.
 
-&odd { 1,X: p(X) }.
+&odd { X: p(X) }.
 ```
 
 ## Installation

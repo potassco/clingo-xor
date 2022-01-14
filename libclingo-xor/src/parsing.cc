@@ -79,10 +79,6 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<X
                 for (auto &&term : elem.tuple()) {
                     tuple.emplace_back(evaluate(term));
                 }
-                check_syntax(tuple.front().type() == Clingo::SymbolType::Number, "first element of tuple must be an integer");
-                if (tuple.front().number() % 2 == 0) {
-                    continue;
-                }
                 auto res = elem_ids.emplace(std::move(tuple), elems.size());
                 auto lit = elem.condition().empty() ? 0 : init.solver_literal(elem.condition_id());
                 if (res.second) {

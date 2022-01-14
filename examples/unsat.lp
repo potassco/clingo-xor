@@ -1,4 +1,4 @@
-{ x; y; z }.
-&odd { 1,x:x; 1,y:y }.
-&odd { 1,y:y; 1,z:z }.
-&odd { 1,x:x; 1,z:z }.
+     {   x;   y;   z }.
+&odd { x:x; y:y      }.
+&odd {      y:y; z:z }.
+&odd { x:x;      z:z }.
