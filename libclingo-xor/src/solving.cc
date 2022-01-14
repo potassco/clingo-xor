@@ -149,6 +149,7 @@ bool Solver::prepare(Clingo::PropagateInit &init, SymbolMap const &symbols) {
 
     for (size_t i = 0; i < n_basic_; ++i) {
         enqueue_(i);
+        propagate_row_(i);
     }
 
     assert_extra(check_tableau_());

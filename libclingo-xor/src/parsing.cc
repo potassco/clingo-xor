@@ -65,10 +65,16 @@ bool is_string(Clingo::TheoryTerm const &term) {
 
 void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<XORConstraint> &iqs) {
     auto theory = init.theory_atoms();
+    auto ass = init.assignment();
     for (auto &&atom : theory) {
         bool even = match(atom.term(), "even", 0);
         bool odd  = match(atom.term(), "odd", 0);
         if (even || odd) {
+            auto lit = init.solver_literal(atom.literal());
+            if (ass.is_false(lit)) {
+                continue;
+            }
+
             // map from tuples to condition
             std::map<std::vector<Clingo::Symbol>, size_t> elem_ids;
             std::vector<std::vector<Clingo::literal_t>> elems;
@@ -80,17 +86,17 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<X
                     tuple.emplace_back(evaluate(term));
                 }
                 auto res = elem_ids.emplace(std::move(tuple), elems.size());
-                auto lit = elem.condition().empty() ? 0 : init.solver_literal(elem.condition_id());
+                auto xor_lit = elem.condition().empty() ? 0 : init.solver_literal(elem.condition_id());
                 if (res.second) {
                     elems.emplace_back();
-                    if (lit != 0) {
-                        elems.back().emplace_back(lit);
+                    if (xor_lit != 0) {
+                        elems.back().emplace_back(xor_lit);
                     }
                 }
                 else {
                     auto lits = elems[res.first->second];
-                    if (lit != 0) {
-                        lits.emplace_back(lit);
+                    if (xor_lit != 0) {
+                        lits.emplace_back(xor_lit);
                     }
                     else {
                         lits.clear();
@@ -104,9 +110,10 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<X
                 lits.erase(std::unique(lits.begin(), lits.end()), lits.end());
                 seen[lits] += 1;
             }
-            // build inequalities
+
+            // gather literals for XOR constraint
             Value rhs{odd};
-            std::vector<Clingo::Symbol> lhs;
+            std::vector<Clingo::literal_t> lhs_lits;
             for (auto &&lits : elems) {
                 auto it = seen.find(lits);
                 if (it->second % 2 == 0) {
@@ -115,33 +122,51 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<X
                 it->second = 0;
                 if (lits.empty()) {
                     rhs.flip();
+                    continue;
                 }
-                else {
-                    Clingo::literal_t eq_lit{0};
-                    if (lits.size() == 1) {
-                        eq_lit = lits.front();
-                    }
-                    else {
-                        eq_lit = init.add_literal();
-                        std::vector<Clingo::literal_t> clause;
-                        clause.reserve(lits.size() + 1);
-                        clause.emplace_back(-eq_lit);
-                        for (auto &&lit : lits) {
-                            clause.emplace_back(lit);
-                            init.add_clause({-lit, eq_lit});
-                        }
-                        init.add_clause(clause);
-                    }
-                    auto res = var_map.try_emplace(eq_lit, Clingo::Number(var_map.size()));
-                    if (res.second) {
-                        iqs.emplace_back(XORConstraint{{res.first->second}, Value{false}, -eq_lit});
-                        iqs.emplace_back(XORConstraint{{res.first->second}, Value{true}, eq_lit});
-                    }
-                    lhs.emplace_back(res.first->second);
+                Clingo::literal_t xor_lit{0};
+                if (lits.size() == 1) {
+                    lhs_lits.emplace_back(lits.front());
+                    continue;
                 }
+                xor_lit = init.add_literal();
+                std::vector<Clingo::literal_t> clause;
+                clause.reserve(lits.size() + 1);
+                clause.emplace_back(-xor_lit);
+                for (auto &&eq_lit : lits) {
+                    clause.emplace_back(eq_lit);
+                    init.add_clause({-eq_lit, xor_lit});
+                }
+                init.add_clause(clause);
+                lhs_lits.emplace_back(xor_lit);
             }
-            auto lit = init.solver_literal(atom.literal());
-            iqs.emplace_back(XORConstraint{std::move(lhs), rhs, lit});
+
+            // build XOR constraint over intermediate variables
+            if (lhs_lits.empty()) {
+                if (rhs && !init.add_clause({-lit})) {
+                    return;
+                }
+                continue;
+            }
+            if (lhs_lits.size() == 1) {
+                auto xor_lit = lhs_lits.front();
+                if (!init.add_clause({-lit, rhs ? xor_lit : -xor_lit})) {
+                    return;
+                }
+                continue;
+            }
+            std::vector<Clingo::Symbol> lhs_syms;
+            for (auto eq_lit : lhs_lits) {
+                auto res = var_map.try_emplace(eq_lit, Clingo::Number(var_map.size()));
+                if (res.second) {
+                    // Note: With this setup, variables can have at most two
+                    // bounds. Data structures could be optimized for this.
+                    iqs.emplace_back(XORConstraint{{res.first->second}, Value{false}, -eq_lit});
+                    iqs.emplace_back(XORConstraint{{res.first->second}, Value{true}, eq_lit});
+                }
+                lhs_syms.emplace_back(res.first->second);
+            }
+            iqs.emplace_back(XORConstraint{std::move(lhs_syms), rhs, lit});
         }
     }
 }
