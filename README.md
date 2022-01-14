@@ -3,11 +3,9 @@
 A simplistic simplex solver for checking satisfiability of a set of XOR
 constraints.
 
-The system is a slightly adjusted version of the clingo-lpx system. I just
-wanted to see if it possible to apply the simplex algorithm to XOR constraints.
-A system to solve XOR constraints efficiently still needs improvements. Since
-the system uses Bland's rule to select pivot elements, it also needs some
-thought whether the algorithm always terminates.
+The system is an adjusted version of the clingo-lpx system. Interestingly, the
+satisfiable of a set of XOR constraints can be determined using (a simplified
+version of) the simplex algorithm.
 
 ## Input
 
