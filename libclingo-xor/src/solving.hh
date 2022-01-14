@@ -39,7 +39,7 @@ private:
         //! Check if the variable has an upper bound.
         [[nodiscard]] bool has_bound() const { return bound != nullptr; }
         //! Set a new value or add to the existing one.
-        void set_value(Solver &s, index_t level, Value num, bool add);
+        void flip_value(Solver &s, index_t level);
 
         //! The bound of a variable.
         Bound const *bound{nullptr};
@@ -75,6 +75,9 @@ public:
     [[nodiscard]] bool prepare(Clingo::PropagateInit &init, SymbolMap const &symbols);
 
     //! Solve the (previously prepared) problem.
+    //!
+    //! If the function returns false, it sets a conflict clause, which can be
+    //! obtained calling method reason().
     [[nodiscard]] bool solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits);
 
     //! Undo assignments on the current level.
@@ -102,16 +105,22 @@ private:
     //! Enqueue basic variable `x_i` if it is conflicting.
     void enqueue_(index_t i);
 
-    //! Set the value of non-basic `x_j` variable to `v`.
-    void update_(index_t level, index_t j, Value v);
+    //! Flip the value of non-basic `x_j` variable.
+    void update_(index_t level, index_t j);
 
     //! Pivots basic variable `x_i` and non-basic variable `x_j`.
-    void pivot_(index_t level, index_t i, index_t j, Value v);
+    void pivot_(index_t level, index_t i, index_t j);
 
-    //! Helper function to select pivot point.
-    [[nodiscard]] bool select_(Variable const &x);
+    //! Check if the given non-basic variable is flippable.
+    //!
+    //! If the variable cannot be flipped, the literal of its bound is
+    //! proactively added to the conflict clause as a side effect.
+    [[nodiscard]] bool flippable_(Variable const &x);
     //! Select pivot point using Bland's rule.
-    State select_(index_t &ret_i, index_t &ret_j, Value const *&ret_v);
+    //!
+    //! If the problem is unsatisfiable, the conflict clause is set as a side
+    //! effect.
+    State select_(index_t &ret_i, index_t &ret_j);
 
     //! Get basic variable associated with row `i`.
     Variable &basic_(index_t i);

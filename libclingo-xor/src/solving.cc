@@ -53,7 +53,7 @@ bool Solver::Variable::update_bound(Solver &s, Clingo::Assignment ass, Bound con
     return this->bound->value == bound.value;
 }
 
-void Solver::Variable::set_value(Solver &s, index_t lvl, Value val, bool add) {
+void Solver::Variable::flip_value(Solver &s, index_t lvl) {
     // We can always assume that the assignment on a previous level was satisfying.
     // Thus, we simply store the old values to be able to restore them when backtracking.
     if (lvl != level) {
@@ -62,12 +62,7 @@ void Solver::Variable::set_value(Solver &s, index_t lvl, Value val, bool add) {
         s.assignment_trail_.emplace_back(level, this - s.variables_.data(), value);
         level = lvl;
     }
-    if (add) {
-        value += val;
-    }
-    else {
-        value = val;
-    }
+    value += 1;
 }
 
 bool Solver::Variable::has_conflict() const {
@@ -160,7 +155,6 @@ bool Solver::prepare(Clingo::PropagateInit &init, SymbolMap const &symbols) {
 bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
     index_t i{0};
     index_t j{0};
-    Value const *v{nullptr};
 
     auto ass = ctl.assignment();
     auto level = ass.decision_level();
@@ -184,7 +178,7 @@ bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
             }
             if (x.reserve_index < n_non_basic_) {
                 if (x.has_bound() && x.value != x.bound->value) {
-                    update_(level, x.reserve_index, x.bound->value);
+                    update_(level, x.reserve_index);
                 }
             }
             else {
@@ -198,7 +192,7 @@ bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
     assert_extra(check_non_basic_());
 
     while (true) {
-        switch (select_(i, j, v)) {
+        switch (select_(i, j)) {
             case State::Satisfiable: {
 #ifdef CLINGOLP_KEEP_SAT_ASSIGNMENT
                 for (auto &[level, index, number] : assignment_trail_) {
@@ -220,8 +214,7 @@ bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
                 return false;
             }
             case State::Unknown: {
-                assert(v != nullptr);
-                pivot_(level, i, j, *v); // NOLINT
+                pivot_(level, i, j);
             }
         }
     }
@@ -301,26 +294,25 @@ bool Solver::check_solution(bool trace) {
     return check_tableau_() && check_basic_();
 }
 
-void Solver::update_(index_t level, index_t j, Value v) {
+void Solver::update_(index_t level, index_t j) {
     auto &xj = non_basic_(j);
-    assert(v != xj.value);
     tableau_.update_col(j, [&](index_t i) {
-        basic_(i).set_value(*this, level, 1, true);
+        basic_(i).flip_value(*this, level);
         enqueue_(i);
     });
-    xj.set_value(*this, level, v, false);
+    xj.flip_value(*this, level);
 }
 
-void Solver::pivot_(index_t level, index_t i, index_t j, Value v) {
+void Solver::pivot_(index_t level, index_t i, index_t j) {
     auto &xi = basic_(i);
     auto &xj = non_basic_(j);
 
     // adjust assignment
-    xi.set_value(*this, level, v, false);
-    xj.set_value(*this, level, 1, true);
+    xi.flip_value(*this, level);
+    xj.flip_value(*this, level);
     tableau_.update_col(j, [&](index_t k) {
         if (k != i) {
-            basic_(k).set_value(*this, level, 1, true);
+            basic_(k).flip_value(*this, level);
             enqueue_(k);
         }
     });
@@ -340,7 +332,7 @@ void Solver::pivot_(index_t level, index_t i, index_t j, Value v) {
     assert_extra(check_non_basic_());
 }
 
-bool Solver::select_(Variable const &x) {
+bool Solver::flippable_(Variable const &x) {
     if (!x.has_bound() || x.value != x.bound->value) {
         return true;
     }
@@ -350,7 +342,7 @@ bool Solver::select_(Variable const &x) {
     return false;
 }
 
-Solver::State Solver::select_(index_t &ret_i, index_t &ret_j, Value const *&ret_v) {
+Solver::State Solver::select_(index_t &ret_i, index_t &ret_j) {
     // This implements Bland's rule selecting the variables with the smallest
     // indices for pivoting.
 
@@ -372,11 +364,10 @@ Solver::State Solver::select_(index_t &ret_i, index_t &ret_j, Value const *&ret_
             index_t kk = variables_.size();
             tableau_.update_row(i, [&](index_t j) {
                 auto jj = variables_[j].index;
-                if (jj < kk && select_(variables_[jj])) {
+                if (jj < kk && flippable_(variables_[jj])) {
                     kk = jj;
                     ret_i = i;
                     ret_j = j;
-                    ret_v = &xi.bound->value;
                 }
             });
             if (kk == variables_.size()) {
