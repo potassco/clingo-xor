@@ -303,8 +303,9 @@ bool Solver::check_solution(bool trace) {
 
 void Solver::update_(index_t level, index_t j, Value v) {
     auto &xj = non_basic_(j);
+    assert(v != xj.value);
     tableau_.update_col(j, [&](index_t i) {
-        basic_(i).set_value(*this, level, v + xj.value, true);
+        basic_(i).set_value(*this, level, 1, true);
         enqueue_(i);
     });
     xj.set_value(*this, level, v, false);

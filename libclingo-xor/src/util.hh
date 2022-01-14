@@ -17,7 +17,7 @@
 using index_t = uint32_t;
 
 
-inline unsigned uabs(int a) {
+inline constexpr unsigned uabs(int a) {
     if (a >= 0) {
         return static_cast<unsigned>(a);
     }
@@ -27,31 +27,31 @@ inline unsigned uabs(int a) {
 // Boolean value with XOR operation and equality comparison.
 class Value {
 public:
-    Value() = default;
+    constexpr Value() = default;
 
-    Value(int num)
+    constexpr Value(int num)
     : num_{static_cast<uint8_t>(uabs(num) % 2U)} {
     }
 
-    friend Value operator+(Value const &a, Value const &b) {
-        return Value(a.num_ ^ b.num_);
+    friend constexpr Value operator+(Value const &a, Value const &b) {
+        return Value{a.num_ ^ b.num_};
     }
-    friend Value &operator+=(Value &a, Value const &b) {
+    friend constexpr Value &operator+=(Value &a, Value const &b) {
         a.num_ ^= b.num_;
         return a;
     }
 
-    friend bool operator==(Value const &a, Value const &b) {
+    friend constexpr bool operator==(Value const &a, Value const &b) {
         return a.num_ == b.num_;
     }
-    friend bool operator!=(Value const &a, Value const &b) {
+    friend constexpr bool operator!=(Value const &a, Value const &b) {
         return a.num_ != b.num_;
     }
 
-    friend bool operator==(Value const &a, int b) {
+    friend constexpr bool operator==(Value const &a, int b) {
         return a == Value{b};
     }
-    friend bool operator!=(Value const &a, int b) {
+    friend constexpr bool operator!=(Value const &a, int b) {
         return a != Value{b};
     }
 
@@ -61,7 +61,7 @@ public:
     }
 
 private:
-    explicit Value(uint8_t num)
+    explicit constexpr Value(uint8_t num)
     : num_{num} {
     }
 
