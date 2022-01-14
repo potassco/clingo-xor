@@ -85,7 +85,8 @@ bool check(clingo_propagate_control_t* i, void* data) {
 //! High level interface to use the XOR propagator.
 class XORPropagatorFacade {
 public:
-    XORPropagatorFacade(clingo_control_t *control, char const *theory) {
+    XORPropagatorFacade(clingo_control_t *control, char const *theory, bool enable_propagate)
+    : prop_{enable_propagate} {
         handle_error(clingo_control_add(control, "base", nullptr, 0, theory));
         static clingo_propagator_t prop = {
             init,
@@ -208,6 +209,7 @@ bool check_parse(char const *key, bool ret) {
 } // namespace
 
 struct clingoxor_theory {
+    bool propagate{true};
     std::unique_ptr<XORPropagatorFacade> clingoxor{nullptr};
 };
 
@@ -230,7 +232,7 @@ extern "C" bool clingoxor_create(clingoxor_theory_t **theory) {
 
 extern "C" bool clingoxor_register(clingoxor_theory_t *theory, clingo_control_t* control) {
     CLINGOXOR_TRY {
-        theory->clingoxor = std::make_unique<XORPropagatorFacade>(control, THEORY);
+        theory->clingoxor = std::make_unique<XORPropagatorFacade>(control, THEORY, theory->propagate);
     }
     CLINGOXOR_CATCH;
 }
@@ -253,6 +255,9 @@ extern "C" bool clingoxor_destroy(clingoxor_theory_t *theory) {
 
 extern "C" bool clingoxor_configure(clingoxor_theory_t *theory, char const *key, char const *value) {
     CLINGOXOR_TRY {
+        if (strcmp(key, "propagate") == 0) {
+            return check_parse("propagate", parse_bool(value, &theory->propagate));
+        }
         std::ostringstream msg;
         msg << "invalid configuration key '" << key << "'";
         clingo_set_error(clingo_error_runtime, msg.str().c_str());
@@ -264,7 +269,9 @@ extern "C" bool clingoxor_configure(clingoxor_theory_t *theory, char const *key,
 extern "C" bool clingoxor_register_options(clingoxor_theory_t *theory, clingo_options_t* options) {
     CLINGOXOR_TRY {
         char const *group = "Clingo.XOR Options";
-        static_cast<void>(group);
+        handle_error(clingo_options_add_flag(options, group, "propagate",
+            "Enable propagation [yes]",
+            &theory->propagate));
     }
     CLINGOXOR_CATCH;
 }

@@ -41,6 +41,8 @@ private:
         //! Flip the value of the variable.
         void flip_value(Solver &s, index_t level);
 
+        //! The bounds associated with the variable.
+        std::vector<Bound*> bounds;
         //! The bound of a variable.
         Bound const *bound{nullptr};
         //! Helper index for pivoting variables.
@@ -50,9 +52,14 @@ private:
         //! The level the variable was assigned on.
         index_t level{0};
         //! The current value of the variable.
-        Value value{0};
+        Value value{false};
         //! Whether this variales is in the queue of conflicting variables.
         bool queued{false};
+        //! Whether the row has to be propagated.
+        //!
+        //! Note that this is not really associated with the variable. This is
+        //! just a convenient location to store the flag.
+        bool in_propagate_set{false};
     };
     struct TrailOffset {
         index_t level;
@@ -69,15 +76,14 @@ private:
 
 public:
     //! Construct a new solver object.
-    Solver(std::vector<XORConstraint> const &inequalities);
+    Solver(std::vector<XORConstraint> const &inequalities, bool enable_propagate);
 
     //! Prepare inequalities for solving.
     [[nodiscard]] bool prepare(Clingo::PropagateInit &init, SymbolMap const &symbols);
 
     //! Solve the (previously prepared) problem.
     //!
-    //! If the function returns false, it sets a conflict clause, which can be
-    //! obtained calling method reason().
+    //! If the function returns false, the solver has to backtrack.
     [[nodiscard]] bool solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits);
 
     //! Undo assignments on the current level.
@@ -88,9 +94,6 @@ public:
 
     //! Return the solve statistics.
     [[nodiscard]] Statistics const &statistics() const;
-
-    //! Return the conflict clause.
-    [[nodiscard]] Clingo::LiteralSpan reason() const { return conflict_clause_; }
 
 private:
     //! Check if the tableau.
@@ -104,6 +107,14 @@ private:
 
     //! Enqueue basic variable `x_i` if it is conflicting.
     void enqueue_(index_t i);
+
+    //! Mark row `i` for propagation.
+    void propagate_row_(index_t i);
+    //! Mark rows in column `j` for propagation.
+    void propagate_col_(index_t j);
+
+    //! Propagate marked rows.
+    bool propagate_(Clingo::PropagateControl &ctl);
 
     //! Flip the value of non-basic `x_j` variable.
     void update_(index_t level, index_t j);
@@ -145,17 +156,21 @@ private:
     std::priority_queue<index_t, std::vector<index_t>, std::greater<>> conflicts_;
     //! The conflict clause.
     std::vector<Clingo::literal_t> conflict_clause_;
+    //! The rowes to be propagated.
+    std::vector<Clingo::literal_t> propagate_set_;
     //! Problem and solving statistics.
     Statistics statistics_;
     //! The number of non-basic variables.
     index_t n_non_basic_{0};
     //! The number of basic variables.
     index_t n_basic_{0};
+    //! Whether propagation is enabled.
+    bool enable_propagate_;
 };
 
 class Propagator : public Clingo::Propagator {
 public:
-    Propagator() = default;
+    Propagator(bool enable_propagate);
     Propagator(Propagator const &) = default;
     Propagator(Propagator &&) noexcept = default;
     Propagator &operator=(Propagator const &) = default;
@@ -183,4 +198,5 @@ private:
     size_t facts_offset_{0};
     std::vector<Clingo::literal_t> facts_;
     std::vector<std::pair<size_t, Solver>> slvs_;
+    bool enable_propagate_;
 };

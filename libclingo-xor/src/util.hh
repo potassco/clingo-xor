@@ -126,7 +126,9 @@ public:
     void update_row(index_t i, F &&f) {
         if (i < rows_.size()) {
             for (auto &col : rows_[i]) {
-                f(col);
+                if (!f(col)) {
+                    break;
+                }
             }
         }
     }

@@ -47,6 +47,8 @@ struct Solver::Prepare {
 
 bool Solver::Variable::update_bound(Solver &s, Clingo::Assignment ass, Bound const &bound) {
     if (!has_bound()) {
+        // Propagation: the number of free variables in the row decreases.
+        // Here should be a good place to update the count.
         s.bound_trail_.emplace_back(bound.variable);
         this->bound = &bound;
     }
@@ -73,8 +75,9 @@ void Statistics::reset() {
     *this = {};
 }
 
-Solver::Solver(std::vector<XORConstraint> const &inequalities)
+Solver::Solver(std::vector<XORConstraint> const &inequalities, bool enable_propagate)
 : inequalities_{inequalities}
+, enable_propagate_{enable_propagate}
 { }
 
 Solver::Variable &Solver::basic_(index_t i) {
@@ -123,18 +126,21 @@ bool Solver::prepare(Clingo::PropagateInit &init, SymbolMap const &symbols) {
         else if (row.size() == 1) {
             auto j = row.front();
             auto &xj = non_basic_(j);
-            bounds_.emplace(x.lit, Bound{
+            auto it = bounds_.emplace(x.lit, Bound{
                 Value{x.rhs},
                 variables_[j].index,
                 x.lit});
+            xj.bounds.emplace_back(&it->second);
         }
         // add an inequality
         else {
             auto i = prep.add_basic();
-            bounds_.emplace(x.lit, Bound{
+            auto &xi = basic_(i);
+            auto it = bounds_.emplace(x.lit, Bound{
                 Value{x.rhs},
                 static_cast<index_t>(variables_.size() - 1),
                 x.lit});
+            xi.bounds.emplace_back(&it->second);
             for (auto j : row) {
                 tableau_.set(i, j, true);
             }
@@ -150,6 +156,68 @@ bool Solver::prepare(Clingo::PropagateInit &init, SymbolMap const &symbols) {
     assert_extra(check_non_basic_());
 
     return true;
+}
+
+bool Solver::propagate_(Clingo::PropagateControl &ctl) {
+    bool ret = true;
+
+    for (auto i : propagate_set_) {
+        conflict_clause_.clear();
+        size_t num_free = 0;
+        Variable *free = nullptr;
+        tableau_.update_row(i, [&](index_t j) {
+            auto &xj = non_basic_(j);
+            if (!xj.has_bound()) {
+                num_free += 1;
+                free = &xj;
+            }
+            else {
+                conflict_clause_.emplace_back(-xj.bound->lit);
+            }
+            return num_free <= 1;
+        });
+        auto &xi = basic_(i);
+        if (!xi.has_bound()) {
+            num_free += 1;
+            free = &xi;
+        }
+        else {
+            conflict_clause_.emplace_back(-xi.bound->lit);
+        }
+        if (num_free == 1) {
+            size_t num = 0;
+            bool sat = false;
+            for (auto *bound : free->bounds) {
+                auto lit = free->value == bound->value ? bound->lit : -bound->lit;
+                // TODO: This case can apparently occur during
+                // multi-shot solving on level 0. Maybe this
+                // can be avoided so that we could rather add
+                // an assertion.
+                if (ctl.assignment().is_true(lit)) {
+                    sat = true;
+                    break;
+                }
+                if (num > 0 && conflict_clause_.back() == lit) {
+                    continue;
+                }
+                conflict_clause_.emplace_back(lit);
+                ++num;
+            }
+            // TODO: Can this add non-unit clauses given the way
+            // constraints are build?
+            if (!sat && !ctl.add_clause(conflict_clause_)) {
+                ret = false;
+                break;
+            }
+        }
+    }
+
+    for (auto i : propagate_set_) {
+        variables_[i].in_propagate_set = false;
+    }
+    propagate_set_.clear();
+
+    return ret;
 }
 
 bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
@@ -174,15 +242,21 @@ bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
                 conflict_clause_.clear();
                 conflict_clause_.emplace_back(-bound.lit);
                 conflict_clause_.emplace_back(-x.bound->lit);
+                ctl.add_clause(conflict_clause_);
                 return false;
             }
             if (x.reverse_index < n_non_basic_) {
                 if (x.has_bound() && x.value != x.bound->value) {
                     update_(level, x.reverse_index);
                 }
+                else {
+                    propagate_col_(x.reverse_index);
+                }
             }
             else {
-                enqueue_(x.reverse_index - n_non_basic_);
+                auto i = x.reverse_index - n_non_basic_;
+                enqueue_(i);
+                propagate_row_(i);
             }
         }
     }
@@ -208,9 +282,10 @@ bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
                 }
                 assignment_trail_.clear();
 #endif
-                return true;
+                return propagate_(ctl);
             }
             case State::Unsatisfiable: {
+                ctl.add_clause(conflict_clause_);
                 return false;
             }
             case State::Unknown: {
@@ -257,6 +332,7 @@ bool Solver::check_tableau_() {
         Value v_i;
         tableau_.update_row(i, [&](index_t j){
             v_i ^= non_basic_(j).value;
+            return true;
         });
         if (v_i != basic_(i).value) {
             return false;
@@ -294,11 +370,25 @@ bool Solver::check_solution_() {
     return check_tableau_() && check_basic_();
 }
 
+void Solver::propagate_row_(index_t i) {
+    if (enable_propagate_ && !variables_[i].in_propagate_set) {
+        propagate_set_.emplace_back(i);
+        variables_[i].in_propagate_set = true;
+    }
+}
+
+void Solver::propagate_col_(index_t j) {
+    if (enable_propagate_) {
+        tableau_.update_col(j, [&](index_t i) { propagate_row_(i); });
+    }
+}
+
 void Solver::update_(index_t level, index_t j) {
     auto &xj = non_basic_(j);
     tableau_.update_col(j, [&](index_t i) {
         basic_(i).flip_value(*this, level);
         enqueue_(i);
+        propagate_row_(i);
     });
     xj.flip_value(*this, level);
 }
@@ -314,6 +404,7 @@ void Solver::pivot_(index_t level, index_t i, index_t j) {
         if (k != i) {
             basic_(k).flip_value(*this, level);
             enqueue_(k);
+            propagate_row_(k);
         }
     });
     assert_extra(check_tableau_());
@@ -324,6 +415,7 @@ void Solver::pivot_(index_t level, index_t i, index_t j) {
     enqueue_(i);
 
     // eliminate x_j from rows k != i
+    // Propagation: this operation changes the number of free variables in a row
     tableau_.eliminate(i, j);
 
     ++statistics_.pivots_;
@@ -369,6 +461,7 @@ Solver::State Solver::select_(index_t &ret_i, index_t &ret_j) {
                     ret_i = i;
                     ret_j = j;
                 }
+                return true;
             });
             if (kk == variables_.size()) {
                 return State::Unsatisfiable;
@@ -380,6 +473,10 @@ Solver::State Solver::select_(index_t &ret_i, index_t &ret_j) {
     assert(check_solution_());
 
     return State::Satisfiable;
+}
+
+Propagator::Propagator(bool enable_propagate)
+: enable_propagate_{enable_propagate}  {
 }
 
 void Propagator::init(Clingo::PropagateInit &init) {
@@ -403,7 +500,10 @@ void Propagator::init(Clingo::PropagateInit &init) {
     slvs_.clear();
     slvs_.reserve(init.number_of_threads());
     for (size_t i = 0, e = init.number_of_threads(); i != e; ++i) {
-        slvs_.emplace_back(0, iqs_);
+        slvs_.emplace_back(
+            std::piecewise_construct,
+            std::forward_as_tuple(0),
+            std::forward_as_tuple(iqs_, enable_propagate_));
         if (!slvs_.back().second.prepare(init, var_map_)) {
             return;
         }
@@ -431,9 +531,7 @@ void Propagator::check(Clingo::PropagateControl &ctl) {
     auto &[offset, slv] = slvs_[ctl.thread_id()];
     if (ass.decision_level() == 0 && offset < facts_offset_) {
         if (!slv.solve(ctl, Clingo::LiteralSpan{facts_.data() + offset, facts_offset_})) { // NOLINT
-            if (!ctl.add_clause(slv.reason())) {
-                return;
-            }
+            return;
         }
         offset = facts_offset_;
     }
@@ -446,7 +544,6 @@ void Propagator::propagate(Clingo::PropagateControl &ctl, Clingo::LiteralSpan ch
     }
     auto &[offset, slv] = slvs_[ctl.thread_id()];
     if (!slv.solve(ctl, changes)) {
-        ctl.add_clause(slv.reason());
         return;
     }
 }

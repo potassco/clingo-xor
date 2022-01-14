@@ -54,7 +54,7 @@ struct ModelHandler : Clingo::SolveEventHandler {
 };
 
 bool run(char const *s) {
-    Propagator prp;
+    Propagator prp{true};
     Clingo::Control ctl;
     prp.register_control(ctl);
 
@@ -65,7 +65,7 @@ bool run(char const *s) {
 }
 
 bool run_q(char const *s) {
-    Propagator prp;
+    Propagator prp{true};
     Clingo::Control ctl;
     prp.register_control(ctl);
 
@@ -76,7 +76,7 @@ bool run_q(char const *s) {
 }
 
 size_t run_m(std::initializer_list<char const *> m) {
-    Propagator prp;
+    Propagator prp{true};
     ModelHandler hnd{prp};
     Clingo::Control ctl{{"0"}};
     prp.register_control(ctl);
