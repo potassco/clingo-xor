@@ -63,7 +63,7 @@ bool is_string(Clingo::TheoryTerm const &term) {
 
 } // namespace
 
-void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<Inequality> &iqs) {
+void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<XORConstraint> &iqs) {
     auto theory = init.theory_atoms();
     for (auto &&atom : theory) {
         bool even = match(atom.term(), "even", 0);
@@ -138,16 +138,14 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<I
                     }
                     auto res = var_map.try_emplace(eq_lit, Clingo::Number(var_map.size()));
                     if (res.second) {
-                        iqs.emplace_back(Inequality{{res.first->second}, 0, -eq_lit});
-                        iqs.emplace_back(Inequality{{res.first->second}, 1, eq_lit});
+                        iqs.emplace_back(XORConstraint{{res.first->second}, 0, -eq_lit});
+                        iqs.emplace_back(XORConstraint{{res.first->second}, 1, eq_lit});
                     }
                     lhs.emplace_back(res.first->second);
                 }
             }
             auto lit = init.solver_literal(atom.literal());
-            iqs.emplace_back(Inequality{std::move(lhs),
-                                        rhs,
-                                        lit});
+            iqs.emplace_back(XORConstraint{std::move(lhs), rhs, lit});
         }
     }
 }

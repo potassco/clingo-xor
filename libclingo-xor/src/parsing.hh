@@ -14,4 +14,4 @@ constexpr char const *THEORY = R"(
 
 using VarMap = std::map<Clingo::literal_t, Clingo::Symbol>;
 
-void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<Inequality> &iqs);
+void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<XORConstraint> &iqs);

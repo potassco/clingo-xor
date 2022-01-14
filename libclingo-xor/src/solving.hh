@@ -20,7 +20,7 @@ struct Statistics {
 //! A solver for finding an assignment satisfying a set of inequalities.
 class Solver {
 private:
-    //! Helper class to prepare the inequalities for solving.
+    //! Helper class to prepare the xor contstraints for solving.
     struct Prepare;
     //! The bounds associated with a Variable.
     //!
@@ -32,13 +32,13 @@ private:
     };
     //! Capture the current state of a variable.
     struct Variable {
-        //! Adjusts the bounds of the variable w.r.t. to the relation of the bound.
+        //! Adjusts the bound of the variable if possible.
         [[nodiscard]] bool update_bound(Solver &s, Clingo::Assignment ass, Bound const &bound);
-        //! Check if te value of the variable conflicts with the bounds;
+        //! Check if te value of the variable conflicts with its bound.
         [[nodiscard]] bool has_conflict() const;
-        //! Check if the variable has an upper bound.
+        //! Check if the variable has a bound.
         [[nodiscard]] bool has_bound() const { return bound != nullptr; }
-        //! Set a new value or add to the existing one.
+        //! Flip the value of the variable.
         void flip_value(Solver &s, index_t level);
 
         //! The bound of a variable.
@@ -46,7 +46,7 @@ private:
         //! Helper index for pivoting variables.
         index_t index{0};
         //! Helper index to obtain row/column index of a variable.
-        index_t reserve_index{0};
+        index_t reverse_index{0};
         //! The level the variable was assigned on.
         index_t level{0};
         //! The current value of the variable.
@@ -69,7 +69,7 @@ private:
 
 public:
     //! Construct a new solver object.
-    Solver(std::vector<Inequality> const &inequalities);
+    Solver(std::vector<XORConstraint> const &inequalities);
 
     //! Prepare inequalities for solving.
     [[nodiscard]] bool prepare(Clingo::PropagateInit &init, SymbolMap const &symbols);
@@ -92,8 +92,6 @@ public:
     //! Return the conflict clause.
     [[nodiscard]] Clingo::LiteralSpan reason() const { return conflict_clause_; }
 
-    //! Check if the current assignment is a solution.
-    [[nodiscard]] bool check_solution(bool trace=false);
 private:
     //! Check if the tableau.
     [[nodiscard]] bool check_tableau_();
@@ -101,6 +99,8 @@ private:
     [[nodiscard]] bool check_basic_();
     //! Check if bounds of non-basic variables are satisfied.
     [[nodiscard]] bool check_non_basic_();
+    //! Check if the current assignment is a solution.
+    [[nodiscard]] bool check_solution_();
 
     //! Enqueue basic variable `x_i` if it is conflicting.
     void enqueue_(index_t i);
@@ -128,7 +128,7 @@ private:
     Variable &non_basic_(index_t j);
 
     //! The set of inequalities.
-    std::vector<Inequality> const &inequalities_;
+    std::vector<XORConstraint> const &inequalities_;
     //! Mapping from literals to bounds.
     std::unordered_multimap<Clingo::literal_t, Bound> bounds_;
     //! Trail of bound assignments (variable, relation, Value).
@@ -179,7 +179,7 @@ private:
     VarMap aux_map_;
     SymbolMap var_map_;
     SymbolVec var_vec_;
-    std::vector<Inequality> iqs_;
+    std::vector<XORConstraint> iqs_;
     size_t facts_offset_{0};
     std::vector<Clingo::literal_t> facts_;
     std::vector<std::pair<size_t, Solver>> slvs_;

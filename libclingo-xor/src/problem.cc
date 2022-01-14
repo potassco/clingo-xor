@@ -1,6 +1,6 @@
 #include "problem.hh"
 
-std::ostream &operator<<(std::ostream &out, Inequality const &x) {
+std::ostream &operator<<(std::ostream &out, XORConstraint const &x) {
     bool plus{false};
     for (auto const &term : x.lhs) {
         if (plus) {

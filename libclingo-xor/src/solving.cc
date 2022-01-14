@@ -11,25 +11,25 @@ struct Solver::Prepare {
         slv.n_non_basic_ = map.size();
         for (index_t i = 0; i != slv.n_non_basic_; ++i) {
             slv.variables_[i].index = i;
-            slv.variables_[i].reserve_index = i;
+            slv.variables_[i].reverse_index = i;
         }
     }
 
     index_t get_non_basic(Clingo::Symbol var) {
         auto jt = map.find(var);
         assert(jt != map.end());
-        return slv.variables_[jt->second].reserve_index;
+        return slv.variables_[jt->second].reverse_index;
     }
 
     index_t add_basic() {
         auto index = slv.variables_.size();
         slv.variables_.emplace_back();
         slv.variables_.back().index = index;
-        slv.variables_.back().reserve_index = index;
+        slv.variables_.back().reverse_index = index;
         return slv.n_basic_++;
     }
 
-    std::vector<index_t> add_row(Inequality const &x) {
+    std::vector<index_t> add_row(XORConstraint const &x) {
         std::vector<index_t> row;
 
         // add non-basic variables
@@ -73,7 +73,7 @@ void Statistics::reset() {
     *this = {};
 }
 
-Solver::Solver(std::vector<Inequality> const &inequalities)
+Solver::Solver(std::vector<XORConstraint> const &inequalities)
 : inequalities_{inequalities}
 { }
 
@@ -176,13 +176,13 @@ bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
                 conflict_clause_.emplace_back(-x.bound->lit);
                 return false;
             }
-            if (x.reserve_index < n_non_basic_) {
+            if (x.reverse_index < n_non_basic_) {
                 if (x.has_bound() && x.value != x.bound->value) {
-                    update_(level, x.reserve_index);
+                    update_(level, x.reverse_index);
                 }
             }
             else {
-                enqueue_(x.reserve_index - n_non_basic_);
+                enqueue_(x.reverse_index - n_non_basic_);
             }
         }
     }
@@ -245,7 +245,7 @@ void Solver::undo() {
 
     trail_offset_.pop_back();
 
-    assert_extra(check_solution());
+    assert_extra(check_solution_());
 }
 
 Statistics const &Solver::statistics() const {
@@ -285,7 +285,7 @@ bool Solver::check_non_basic_() {
     return true;
 }
 
-bool Solver::check_solution(bool trace) {
+bool Solver::check_solution_() {
     for (auto &x : variables_) {
         if (x.has_bound() && x.bound->value != x.value) {
             return false;
@@ -319,7 +319,7 @@ void Solver::pivot_(index_t level, index_t i, index_t j) {
     assert_extra(check_tableau_());
 
     // swap variables x_i and x_j
-    std::swap(xi.reserve_index, xj.reserve_index);
+    std::swap(xi.reverse_index, xj.reverse_index);
     std::swap(variables_[i + n_non_basic_].index, variables_[j].index);
     enqueue_(i);
 
@@ -349,7 +349,7 @@ Solver::State Solver::select_(index_t &ret_i, index_t &ret_j) {
     for (; !conflicts_.empty(); conflicts_.pop()) {
         auto ii = conflicts_.top();
         auto &xi = variables_[ii];
-        auto i = xi.reserve_index;
+        auto i = xi.reverse_index;
         assert(ii == variables_[i].index);
         xi.queued = false;
         // the queue might contain variables that meanwhile became basic
@@ -377,7 +377,7 @@ Solver::State Solver::select_(index_t &ret_i, index_t &ret_j) {
         }
     }
 
-    assert(check_solution());
+    assert(check_solution_());
 
     return State::Satisfiable;
 }
@@ -436,11 +436,6 @@ void Propagator::check(Clingo::PropagateControl &ctl) {
             }
         }
         offset = facts_offset_;
-    }
-    if (ass.is_total()) {
-        if (!slv.check_solution(true)) {
-            throw std::runtime_error("invalid solution");
-        }
     }
 }
 
