@@ -47,6 +47,8 @@ struct Solver::Prepare {
 
 bool Solver::Variable::update_bound(Solver &s, Clingo::Assignment ass, Bound const &bound) {
     if (!has_bound()) {
+        // Propagation: the number of free variables in the row decreases.
+        // Here should be a good place to update the count.
         s.bound_trail_.emplace_back(bound.variable);
         this->bound = &bound;
     }
@@ -209,11 +211,15 @@ bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
                 }
                 assignment_trail_.clear();
 #endif
-                // TODO: This is just a test to see what kind of effect
+                // Propagation: This is just a test to see what kind of effect
                 // propagation has. So far, it seems like something that has to
                 // be implemented to reduce choices/conflicts. The following
                 // has to be implemented better via watches/counters to
                 // efficiently detect when a bound can be propagated.
+                //
+                // A simple implementation:
+                // - we mark changed rows during propagation
+                // - we traverse marked rows and perform propagation
                 for (index_t i = 0; i < n_basic_; ++i) {
                     conflict_clause_.clear();
                     size_t num_free = 0;
@@ -384,6 +390,7 @@ void Solver::pivot_(index_t level, index_t i, index_t j) {
     enqueue_(i);
 
     // eliminate x_j from rows k != i
+    // Propagation: this operation changes the number of free variables in a row
     tableau_.eliminate(i, j);
 
     ++statistics_.pivots_;
