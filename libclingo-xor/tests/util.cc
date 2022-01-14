@@ -32,6 +32,7 @@ TEST_CASE("util") {
         // traverse the first row
         t.update_row(0, [](index_t j) {
             REQUIRE(j == 2);
+            return true;
         });
         REQUIRE(t.size() == 1);
 
