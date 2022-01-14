@@ -20,7 +20,7 @@ def adjust_version(url):
     version = None
     with open('libclingo-xor/clingo-xor.h') as fh:
         for line in fh:
-            m = match(r'#define CLINGOLPX_VERSION "([0-9]+\.[0-9]+\.[0-9]+)"', line)
+            m = match(r'#define CLINGOXOR_VERSION "([0-9]+\.[0-9]+\.[0-9]+)"', line)
             if m is not None:
                 version = m.group(1)
     assert version is not None

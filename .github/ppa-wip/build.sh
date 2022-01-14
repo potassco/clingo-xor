@@ -63,7 +63,7 @@ for act in "${@}"; do
                 $rep/
             ;;
         changes)
-            VERSION="$(sed -n '/#define CLINGOLPX_VERSION "/s/.*"\([0-9]\+\.[0-9\+]\.[0-9]\+\)".*/\1/p' ../../libclingo-xor/clingo-xor.h)"
+            VERSION="$(sed -n '/#define CLINGOXOR_VERSION "/s/.*"\([0-9]\+\.[0-9\+]\.[0-9]\+\)".*/\1/p' ../../libclingo-xor/clingo-xor.h)"
             BUILD=$(curl -sL http://ppa.launchpad.net/potassco/${ref}/ubuntu/pool/main/c/clingo-xor/ | sed -n "/${VERSION//./\\.}-${rep}[0-9]\+\.dsc/s/.*${rep}\([0-9]\+\).*/\1/p" | sort -rn | head -1)
             cat > ${rep}/debian/changelog <<EOF
 clingo-xor (${VERSION}-${rep}$[BUILD+1]) ${rep}; urgency=medium

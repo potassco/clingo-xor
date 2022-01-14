@@ -5,7 +5,7 @@ pip:
         version = None
         with open('libclingo-xor/clingo-xor.h') as fh:
             for line in fh:
-                m = match(r'#define CLINGOLPX_VERSION "([0-9]+\.[0-9]+\.[0-9]+)"', line)
+                m = match(r'#define CLINGOXOR_VERSION "([0-9]+\.[0-9]+\.[0-9]+)"', line)
                 if m is not None:
                     version = m.group(1)
     build_depends: |
@@ -40,7 +40,7 @@ conda:
         version = None
         with open('libclingo-xor/clingo-xor.h') as fh:
             for line in fh:
-                m = match(r'#define CLINGOLPX_VERSION "([0-9]+\.[0-9]+\.[0-9]+)"', line)
+                m = match(r'#define CLINGOXOR_VERSION "([0-9]+\.[0-9]+\.[0-9]+)"', line)
                 if m is not None:
                     version = m.group(1)
     meta:
@@ -83,12 +83,12 @@ conda:
         cd build
 
         cmake .. \
-            -DCLINGOLPX_MANAGE_RPATH=Off \
+            -DCLINGOXOR_MANAGE_RPATH=Off \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER="${CXX}" \
             -DCMAKE_INSTALL_LIBDIR="lib" \
             -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
-            -DPYCLINGOLPX_ENABLE="require" \
+            -DPYCLINGOXOR_ENABLE="require" \
             -DPython_ROOT_DIR="${PREFIX}"
 
         make -j${CPU_COUNT}
@@ -98,12 +98,12 @@ conda:
         mkdir build
 
         cmake -G "Ninja" -H. -Bbuild ^
-            -DCLINGOLPX_MANAGE_RPATH=Off ^
+            -DCLINGOXOR_MANAGE_RPATH=Off ^
             -DCMAKE_BUILD_TYPE=Release ^
             -DCMAKE_CXX_COMPILER="%CXX%" ^
             -DCMAKE_INSTALL_BINDIR="." ^
             -DCMAKE_INSTALL_PREFIX="%PREFIX%" ^
-            -DPYCLINGOLPX_ENABLE="require" ^
+            -DPYCLINGOXOR_ENABLE="require" ^
             -DPython_ROOT_DIR="%PREFIX%"
 
         cmake --build build
@@ -140,7 +140,7 @@ ppa:
     source_url:
         'https://github.com/potassco/clingo-xor'
     version: |-
-        $(sed -n '/#define CLINGOLPX_VERSION "/s/.*"\([0-9]\+\.[0-9\+]\.[0-9]\+\)".*/\1/p' ../../libclingo-xor/clingo-xor.h)
+        $(sed -n '/#define CLINGOXOR_VERSION "/s/.*"\([0-9]\+\.[0-9\+]\.[0-9]\+\)".*/\1/p' ../../libclingo-xor/clingo-xor.h)
     build_depends:
         - 'dh-python'
     create_depends: []
@@ -220,4 +220,4 @@ ppa:
             	dh $@ --with python3
 
             override_dh_auto_configure:
-            	dh_auto_configure -- -DCMAKE_LIBRARY_PATH=$(DEB_HOST_MULTIARCH) -DPYCLINGOLPX_ENABLE=require -DCLINGOLPX_MANAGE_RPATH=Off -DPYCLINGOLPX_INSTALL_DIR=/usr/lib/python3/dist-packages
+            	dh_auto_configure -- -DCMAKE_LIBRARY_PATH=$(DEB_HOST_MULTIARCH) -DPYCLINGOXOR_ENABLE=require -DCLINGOXOR_MANAGE_RPATH=Off -DPYCLINGOXOR_INSTALL_DIR=/usr/lib/python3/dist-packages

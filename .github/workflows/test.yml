@@ -54,5 +54,5 @@ jobs:
         --build-config "${{ matrix.build_type }}"
         --build-generator "${{ matrix.generator }}"
         --build-and-test . build
-        --build-options -DCLINGOLPX_BUILD_TESTS=On
+        --build-options -DCLINGOXOR_BUILD_TESTS=On
         --test-command ctest -V --build-config "${{ matrix.build_type }}"
