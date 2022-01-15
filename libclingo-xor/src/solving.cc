@@ -5,8 +5,6 @@
 
 bool Solver::Variable::update_bound(Solver &s, Clingo::Assignment ass, Bound const &bound) {
     if (!has_bound()) {
-        // Propagation: the number of free variables in the row decreases.
-        // Here should be a good place to update the count.
         s.bound_trail_.emplace_back(bound.variable);
         this->bound = &bound;
     }
@@ -95,6 +93,7 @@ bool Solver::prepare(Clingo::PropagateInit &init, size_t n_variables) {
             variables_[j].bounds.emplace_back(&it->second);
         }
         // add an xor constraint
+        // (guaranteed to have at least two elements)
         else {
             // add basic variable
             auto index = variables_.size();
@@ -117,7 +116,6 @@ bool Solver::prepare(Clingo::PropagateInit &init, size_t n_variables) {
 
     for (size_t i = 0; i < n_basic_; ++i) {
         enqueue_(i);
-        propagate_row_(i);
     }
 
     assert_extra(check_tableau_());
@@ -181,11 +179,6 @@ bool Solver::propagate_(Clingo::PropagateControl &ctl) {
         }
     }
 
-    for (auto i : propagate_set_) {
-        variables_[i].in_propagate_set = false;
-    }
-    propagate_set_.clear();
-
     return ret;
 }
 
@@ -203,6 +196,16 @@ bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
             static_cast<index_t>(assignment_trail_.size())});
     }
 
+    // NOTE: Initially, all rows in the tableaux are guaranteed to have at
+    // least two elements. This means that initially there are no rows that can
+    // be propagated because at least one bound has to be set. If any row
+    // becomes unit-resulting, it is enqueued below and propagated at the end
+    // in case the XOR constraints are found to be satisfiable.
+    for (auto i : propagate_set_) {
+        variables_[i].in_propagate_set = false;
+    }
+    propagate_set_.clear();
+
     for (auto lit : lits) {
         for (auto it = bounds_.find(lit), ie = bounds_.end(); it != ie && it->first == lit; ++it) {
             auto const &[lit, bound] = *it;
@@ -215,6 +218,8 @@ bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
                 return false;
             }
             if (x.reverse_index < n_non_basic_) {
+                // NOTE: The way rows are marked for propagation here is
+                // probably not as efficient as it could be.
                 if (x.has_bound() && x.value != x.bound->value) {
                     update_(level, x.reverse_index);
                 }
