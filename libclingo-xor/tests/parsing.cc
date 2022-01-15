@@ -3,57 +3,57 @@
 
 #include <sstream>
 
-template <typename T>
-std::string str(T &&x) {
-    std::ostringstream oss;
-    oss << x;
-    return oss.str();
+namespace {
+
+struct TestPropagator : public Clingo::Propagator {
+    void init(Clingo::PropagateInit &init) override {
+        VarMap vars;
+        evaluate_theory(init, vars, eqs);
+    }
+    std::vector<XORConstraint> eqs;
+};
+
+using S = std::vector<std::string>;
+
+S evaluate(char const *prg) {
+    TestPropagator prp;
+    Clingo::Control ctl;
+    ctl.register_propagator(prp);
+    ctl.add("base", {}, THEORY);
+    ctl.add("base", {}, prg);
+    ctl.ground({{"base", {}}});
+    ctl.solve(Clingo::LiteralSpan{}, nullptr, false, false).get();
+    S ret;
+    for (auto &eq : prp.eqs) {
+        std::ostringstream ss;
+        eq.lit = eq.lit > 0 ? 1 : -1;
+        ss << eq;
+        ret.emplace_back(ss.str());
+    }
+    return ret;
 }
 
+} // namespace
+
 TEST_CASE("parsing") {
-    Clingo::Control ctl;
-    ctl.add("base", {}, THEORY);
-    Clingo::literal_t n = 0;
+    // translation to clauses
+    REQUIRE(evaluate("&even { x }.").empty());
+    REQUIRE(evaluate("&odd  { x }.").empty());
+    REQUIRE(evaluate("{x}. &odd  { x: x }.").empty());
 
-    // TODO: needs a propagator to test
+    REQUIRE(evaluate("{x; y}. &even { x: x; y: y }.") == S{
+        "var_0 = 0 :- not lit_1",       // x = 0
+        "var_0 = 1 :- lit_1",           // x = 1
+        "var_1 = 0 :- not lit_1",       // y = 0
+        "var_1 = 1 :- lit_1",           // y = 1
+        "var_0 + var_1 = 0 :- lit_1"}); // x + y = 0
 
-    SECTION("example 1") {
-        ctl.add("base", {}, "{x; y}. &even { 1,x: x; 1,y: y }.\n");
-        ctl.ground({{"base", {}}});
+    REQUIRE(evaluate("{x; y; z}. &even { x: x; yz: y; yz: z }.") == S{
+        "var_0 = 0 :- not lit_1",       // x  = 0
+        "var_0 = 1 :- lit_1",           // x  = 1
+        "var_1 = 0 :- not lit_1",       // yz = 0
+        "var_1 = 1 :- lit_1",           // yz = 1
+        "var_0 + var_1 = 0 :- lit_1"}); // x + y = 0
 
-        /*
-        VarMap vars;
-        std::vector<Inequality> eqs;
-        evaluate_theory(ctl.theory_atoms(), mapper, vars, eqs);
-        REQUIRE(eqs.size() == 5);
-        REQUIRE(str(eqs.back()) == "#aux_0 + #aux_1 = 0 :- lit_3");
-        */
-    }
-
-    SECTION("example 2") {
-        ctl.add("base", {}, "&even { 1,x }.\n");
-        ctl.ground({{"base", {}}});
-
-        /*
-        VarMap vars;
-        std::vector<Inequality> eqs;
-        evaluate_theory(ctl.theory_atoms(), mapper, vars, eqs);
-        REQUIRE(eqs.size() == 1);
-        REQUIRE(str(eqs.front()) == "0 = 1 :- lit_1");
-        */
-    }
-
-    SECTION("example 3") {
-        ctl.add("base", {}, "&odd {  1,x; 1,y }.\n");
-        ctl.ground({{"base", {}}});
-
-        /*
-        VarMap vars;
-        std::vector<Inequality> eqs;
-        evaluate_theory(ctl.theory_atoms(), mapper, vars, eqs);
-        REQUIRE(eqs.size() == 1);
-        REQUIRE(str(eqs.front()) == "0 = 1 :- lit_1");
-        */
-    }
 };
 
