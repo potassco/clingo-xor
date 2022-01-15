@@ -156,10 +156,9 @@ bool Solver::propagate_(Clingo::PropagateControl &ctl) {
             bool sat = false;
             for (auto *bound : free->bounds) {
                 auto lit = free->value == bound->value ? bound->lit : -bound->lit;
-                // TODO: This case can apparently occur during
-                // multi-shot solving on level 0. Maybe this
-                // can be avoided so that we could rather add
-                // an assertion.
+                // TODO: This case can apparently occur during multi-shot
+                // solving on level 0. Maybe this can be avoided so that we
+                // could rather add an assertion.
                 if (ctl.assignment().is_true(lit)) {
                     sat = true;
                     break;
@@ -170,8 +169,9 @@ bool Solver::propagate_(Clingo::PropagateControl &ctl) {
                 conflict_clause_.emplace_back(lit);
                 ++num;
             }
-            // TODO: Can this add non-unit clauses given the way
-            // constraints are build?
+            // Note: By construction, a variable has at most two bounds. In
+            // case it has two bounds, they have opposite literals and values.
+            // Thus, the conflict_clause_ is guaranteed to be unit-resulting.
             if (!sat && !ctl.add_clause(conflict_clause_)) {
                 ret = false;
                 break;
