@@ -28,9 +28,9 @@
 //! Major version number.
 #define CLINGOXOR_VERSION_MAJOR 1
 //! Minor version number.
-#define CLINGOXOR_VERSION_MINOR 1
+#define CLINGOXOR_VERSION_MINOR 0
 //! Revision number.
-#define CLINGOXOR_VERSION_REVISION 1
+#define CLINGOXOR_VERSION_REVISION 0
 //! String representation of version.
 #define CLINGOXOR_VERSION "1.1.1"
 
