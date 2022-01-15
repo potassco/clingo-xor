@@ -11,7 +11,8 @@
 struct Statistics {
     void reset();
 
-    Timer timer;
+    Timer total;
+    Timer propagate;
     size_t pivots{0};
     size_t sat{0};
     size_t unsat{0};

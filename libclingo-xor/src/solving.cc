@@ -126,6 +126,7 @@ bool Solver::prepare(Clingo::PropagateInit &init, size_t n_variables) {
 }
 
 bool Solver::propagate_(Clingo::PropagateControl &ctl) {
+    auto timer = statistics_.propagate.start();
     bool ret = true;
 
     for (auto i : propagate_set_) {
@@ -182,7 +183,7 @@ bool Solver::propagate_(Clingo::PropagateControl &ctl) {
 }
 
 bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
-    auto timer = statistics_.timer.start();
+    auto timer = statistics_.total.start();
     index_t i{0};
     index_t j{0};
 
@@ -473,22 +474,26 @@ void Propagator::register_control(Clingo::Control &ctl) {
 
 void Propagator::on_statistics(Clingo::UserStatistics step, Clingo::UserStatistics accu) {
     auto step_simplex = step.add_subkey("Simplex", Clingo::StatisticsType::Map);
-    auto step_time = step_simplex.add_subkey("Time", Clingo::StatisticsType::Value);
+    auto step_total = step_simplex.add_subkey("Time", Clingo::StatisticsType::Value);
+    auto step_propagate = step_simplex.add_subkey("Propagate", Clingo::StatisticsType::Value);
     auto step_pivots = step_simplex.add_subkey("Pivots", Clingo::StatisticsType::Value);
     auto step_sat = step_simplex.add_subkey("SAT", Clingo::StatisticsType::Value);
     auto step_unsat = step_simplex.add_subkey("UNSAT", Clingo::StatisticsType::Value);
     auto accu_simplex = accu.add_subkey("Simplex", Clingo::StatisticsType::Map);
-    auto accu_time = accu_simplex.add_subkey("Time", Clingo::StatisticsType::Value);
+    auto accu_total = accu_simplex.add_subkey("Time", Clingo::StatisticsType::Value);
+    auto accu_propagate = accu_simplex.add_subkey("Propagate", Clingo::StatisticsType::Value);
     auto accu_pivots = accu_simplex.add_subkey("Pivots", Clingo::StatisticsType::Value);
     auto accu_sat = accu_simplex.add_subkey("SAT", Clingo::StatisticsType::Value);
     auto accu_unsat = accu_simplex.add_subkey("UNSAT", Clingo::StatisticsType::Value);
     for (auto const &[offset, slv] : slvs_) {
         step_pivots.set_value(slv.statistics().pivots);
-        step_time.set_value(slv.statistics().timer.total());
+        step_total.set_value(slv.statistics().total.total());
+        step_propagate.set_value(slv.statistics().propagate.total());
         step_sat.set_value(slv.statistics().sat);
         step_unsat.set_value(slv.statistics().unsat);
         accu_pivots.set_value(accu_pivots.value() + slv.statistics().pivots);
-        accu_time.set_value(slv.statistics().timer.total());
+        accu_total.set_value(slv.statistics().total.total());
+        accu_propagate.set_value(slv.statistics().propagate.total());
         accu_sat.set_value(slv.statistics().sat);
         accu_unsat.set_value(slv.statistics().unsat);
     }
