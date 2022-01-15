@@ -28,20 +28,6 @@
 
 #include <sstream>
 
-#ifdef CLINGOXOR_PROFILE
-
-class Profiler {
-public:
-    Profiler(char const *path) {
-        ProfilerStart(path);
-    }
-    ~Profiler() {
-        ProfilerStop();
-    }
-};
-
-#endif
-
 #define CLINGOXOR_TRY try // NOLINT
 #define CLINGOXOR_CATCH catch (...){ Clingo::Detail::handle_cxx_error(); return false; } return true // NOLINT
 

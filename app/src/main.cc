@@ -29,6 +29,33 @@
 #include <fstream>
 #include <limits>
 
+#ifdef CLINGOXOR_PROFILE
+
+#include <gperftools/profiler.h>
+
+class Profiler {
+public:
+    Profiler(char const *path) {
+        ProfilerStart(path);
+    }
+    ~Profiler() {
+        ProfilerStop();
+    }
+};
+
+#else
+
+class Profiler {
+public:
+    Profiler(char const *path) {
+        static_cast<void>(path);
+    }
+    ~Profiler() {
+    }
+};
+
+#endif
+
 namespace ClingoXOR {
 
 using Clingo::Detail::handle_error;
@@ -90,6 +117,7 @@ public:
         });
 
         ctl.ground({{"base", {}}});
+        Profiler prof{"profile.out"};
         ctl.solve(Clingo::SymbolicLiteralSpan{}, this, false, false).get();
     }
     //! Register options of the theory and optimization related options.

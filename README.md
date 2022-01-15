@@ -26,36 +26,41 @@ To compile the package, [cmake], [clingo], and a C++ compiler supporting C++17
 have to be installed. All these requirements can be installed with [anaconda].
 
 ```bash
-conda create -n simplex -c potassco/label/dev cmake ninja clingo gxx_linux-64
+conda create -n simplex cmake ninja clingo cxx-compiler
 conda activate simplex
-cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-[cmake]: https://cmake.org
-[clingo]: https://github.com/potassco/clingo
-[anaconda]: https://anaconda.org
-
 ## Profiling
 
-Profiling with the [gperftools] can be enabled via cmake.
+Profiling with the [gperftools] can be enabled via cmake. The following
+instructions are tailed for Linux. They might serve as a template for other
+operating systems.
 
 ```bash
-conda create -n profile -c conda-forge -c potassco/label/dev cmake ninja clingo gxx_linux-64 gperftools
+conda create -n profile -c conda-forge cmake ninja clingo cxx-compiler gperftools libunwind
 conda activate profile
-cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCLINGOLP_PROFILE=ON
+cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCLINGOXOR_PROFILE=ON
 cmake --build build
 ```
 
 The resulting binary can then be profiled using the following calls:
 
 ```bash
-CPUPROFILE_FREQUENCY=1000 ./build/clingo-xor examples/xor.lp --stats -c n=132 -q 0
-google-pprof --gv ./build/clingo-xor profile.out
+CPUPROFILE_FREQUENCY=1000 ./build/bin/clingo-xor examples/simple.lp --stats -q 0
+google-pprof --gv ./build/bin/clingo-xor profile.out
 ```
 
-[gperftools]: https://gperftools.github.io/gperftools/cpuprofile.html
+The latter call might require the ghostview viewer, which is not available via
+conda but is available in (almost) any Linux distribution. Also, a more
+substantial example should be chosen to actually profile anything.
 
 ## Literature
 
 - "Integrating Simplex with `DPLL(T)`" by Bruno Dutertre and Leonardo de Moura
+
+[cmake]: https://cmake.org
+[clingo]: https://github.com/potassco/clingo
+[anaconda]: https://anaconda.org
+[gperftools]: https://gperftools.github.io/gperftools/cpuprofile.html
