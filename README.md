@@ -1,11 +1,11 @@
-# clingo modulo simplex
+# clingo with XOR constraints
 
-A simplistic simplex solver for checking satisfiability of a set of XOR
+A simplistic simplex solver for checking the satisfiability of a set of XOR
 constraints.
 
-The system is an adjusted version of the clingo-lpx system. Interestingly, the
-satisfiable of a set of XOR constraints can be determined using (a simplified
-version of) the simplex algorithm.
+The system is an adjusted version of the [clingo-lpx] system. Interestingly,
+the satisfiable of a set of XOR constraints can be determined using (a
+simplified version of) the simplex algorithm.
 
 ## Input
 
@@ -26,15 +26,15 @@ To compile the package, [cmake], [clingo], and a C++ compiler supporting C++17
 have to be installed. All these requirements can be installed with [anaconda].
 
 ```bash
-conda create -n simplex cmake ninja clingo cxx-compiler
-conda activate simplex
+conda create -n clingo-xor -c conda-forge cmake ninja clingo cxx-compiler
+conda activate clingo-xor
 cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
 ## Profiling
 
-Profiling with the [gperftools] can be enabled via cmake. The following
+Profiling with [gperftools] can be enabled via cmake. The following
 instructions are tailed for Linux. They might serve as a template for other
 operating systems.
 
@@ -52,9 +52,9 @@ CPUPROFILE_FREQUENCY=1000 ./build/bin/clingo-xor examples/simple.lp --stats -q 0
 google-pprof --gv ./build/bin/clingo-xor profile.out
 ```
 
-The latter call might require the ghostview viewer, which is not available via
-conda but is available in (almost) any Linux distribution. Also, a more
-substantial example should be chosen to actually profile anything.
+The latter call requires the ghostview viewer, which is not available for conda
+but is available in (almost) any Linux distribution. Also, a more substantial
+example should be chosen to actually profile anything.
 
 ## Literature
 
@@ -64,3 +64,4 @@ substantial example should be chosen to actually profile anything.
 [clingo]: https://github.com/potassco/clingo
 [anaconda]: https://anaconda.org
 [gperftools]: https://gperftools.github.io/gperftools/cpuprofile.html
+[clingo-lpx]: https://github.com/potassco/clingo-lpx
