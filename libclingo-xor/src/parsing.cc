@@ -94,7 +94,7 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<X
                     }
                 }
                 else {
-                    auto lits = elems[res.first->second];
+                    auto &lits = elems[res.first->second];
                     if (xor_lit != 0) {
                         lits.emplace_back(xor_lit);
                     }
