@@ -156,9 +156,8 @@ bool Solver::propagate_(Clingo::PropagateControl &ctl) {
             bool sat = false;
             for (auto *bound : free->bounds) {
                 auto lit = free->value == bound->value ? bound->lit : -bound->lit;
-                // TODO: This case can apparently occur during multi-shot
-                // solving on level 0. Maybe this can be avoided so that we
-                // could rather add an assertion.
+                // Note: This case can happen if a bound is propagated but the
+                // propagator has not yet been notified about the change.
                 if (ctl.assignment().is_true(lit)) {
                     sat = true;
                     break;
