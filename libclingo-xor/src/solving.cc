@@ -3,48 +3,6 @@
 
 #include <unordered_set>
 
-struct Solver::Prepare {
-    Prepare(Solver &slv, SymbolMap const &map)
-    : slv{slv}
-    , map{map} {
-        slv.variables_.resize(map.size());
-        slv.n_non_basic_ = map.size();
-        for (index_t i = 0; i != slv.n_non_basic_; ++i) {
-            slv.variables_[i].index = i;
-            slv.variables_[i].reverse_index = i;
-        }
-    }
-
-    index_t get_non_basic(Clingo::Symbol var) {
-        auto jt = map.find(var);
-        assert(jt != map.end());
-        return slv.variables_[jt->second].reverse_index;
-    }
-
-    index_t add_basic() {
-        auto index = slv.variables_.size();
-        slv.variables_.emplace_back();
-        slv.variables_.back().index = index;
-        slv.variables_.back().reverse_index = index;
-        return slv.n_basic_++;
-    }
-
-    std::vector<index_t> add_row(XORConstraint const &x) {
-        std::vector<index_t> row;
-
-        // add non-basic variables
-        for (auto const &term : x.lhs) {
-            row.emplace_back(get_non_basic(term));
-        }
-
-        return row;
-    }
-
-    Solver &slv;
-    SymbolMap const &map;
-    std::vector<index_t> basic;
-};
-
 bool Solver::Variable::update_bound(Solver &s, Clingo::Assignment ass, Bound const &bound) {
     if (!has_bound()) {
         // Propagation: the number of free variables in the row decreases.
@@ -104,44 +62,54 @@ Value Solver::get_value(index_t i) const {
     return variables_[i].value;
 }
 
-bool Solver::prepare(Clingo::PropagateInit &init, SymbolMap const &symbols) {
+bool Solver::prepare(Clingo::PropagateInit &init, size_t n_variables) {
     auto ass = init.assignment();
 
-    Prepare prep{*this, symbols};
+    // initialize non-basic variables
+    variables_.resize(n_variables);
+    n_non_basic_ = n_variables;
+    for (index_t i = 0; i != n_non_basic_; ++i) {
+        variables_[i].index = i;
+        variables_[i].reverse_index = i;
+    }
+
+    // setup tableaux, bounds, and basic variables
     for (auto const &x : inequalities_) {
         if (ass.is_false(x.lit)) {
             continue;
         }
 
-        // transform inequality into row suitable for tableau
-        auto row = prep.add_row(x);
-
         // check bound against 0
-        if (row.empty()) {
+        if (x.lhs.empty()) {
             if (x.rhs && !init.add_clause({-x.lit})) {
                 return false;
             }
         }
         // add a bound to a non-basic variable
-        else if (row.size() == 1) {
-            auto j = row.front();
-            auto &xj = non_basic_(j);
+        else if (x.lhs.size() == 1) {
+            auto j = x.lhs.front();
             auto it = bounds_.emplace(x.lit, Bound{
                 Value{x.rhs},
                 variables_[j].index,
                 x.lit});
-            xj.bounds.emplace_back(&it->second);
+            variables_[j].bounds.emplace_back(&it->second);
         }
-        // add an inequality
+        // add an xor constraint
         else {
-            auto i = prep.add_basic();
-            auto &xi = basic_(i);
+            // add basic variable
+            auto index = variables_.size();
+            variables_.emplace_back();
+            variables_.back().index = index;
+            variables_.back().reverse_index = index;
+            auto i = n_basic_++;
+            // add bound
             auto it = bounds_.emplace(x.lit, Bound{
                 Value{x.rhs},
                 static_cast<index_t>(variables_.size() - 1),
                 x.lit});
-            xi.bounds.emplace_back(&it->second);
-            for (auto j : row) {
+            variables_.back().bounds.emplace_back(&it->second);
+            // set tableaux
+            for (auto j : x.lhs) {
                 tableau_.set(i, j, true);
             }
         }
@@ -486,15 +454,9 @@ void Propagator::init(Clingo::PropagateInit &init) {
         init.set_check_mode(Clingo::PropagatorCheckMode::Partial);
     }
 
-    evaluate_theory(init, aux_map_, iqs_);
+    evaluate_theory(init, var_map_, iqs_);
+    // add watches
     for (auto &x : iqs_) {
-        // add variables
-        for (auto const &var : x.lhs) {
-            if (var_map_.emplace(var, var_map_.size()).second) {
-                var_vec_.emplace_back(var);
-            }
-        }
-        // add watch
         init.add_watch(x.lit);
     }
 
@@ -505,7 +467,7 @@ void Propagator::init(Clingo::PropagateInit &init) {
             std::piecewise_construct,
             std::forward_as_tuple(0),
             std::forward_as_tuple(iqs_, enable_propagate_));
-        if (!slvs_.back().second.prepare(init, var_map_)) {
+        if (!slvs_.back().second.prepare(init, var_map_.size())) {
             return;
         }
     }
@@ -551,28 +513,4 @@ void Propagator::propagate(Clingo::PropagateControl &ctl, Clingo::LiteralSpan ch
 
 void Propagator::undo(Clingo::PropagateControl const &ctl, Clingo::LiteralSpan changes) noexcept {
     slvs_[ctl.thread_id()].second.undo();
-}
-
-std::optional<index_t> Propagator::lookup_symbol(Clingo::Symbol symbol) const {
-    if (auto it = var_map_.find(symbol); it != var_map_.end()) {
-        return it->second;
-    }
-    return {};
-}
-
-Clingo::Symbol Propagator::get_symbol(index_t i) const {
-    return var_vec_[i];
-}
-
-bool Propagator::has_value(index_t thread_id, index_t i) const {
-    static_cast<void>(thread_id);
-    return i < var_vec_.size();
-}
-
-Value Propagator::get_value(index_t thread_id, index_t i) const {
-    return slvs_[thread_id].second.get_value(i);
-}
-
-index_t Propagator::n_values(index_t thread_id) const {
-    return var_vec_.size();
 }

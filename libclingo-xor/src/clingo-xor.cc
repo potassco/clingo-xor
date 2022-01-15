@@ -98,62 +98,6 @@ public:
         handle_error(clingo_control_register_propagator(control, &prop, &prop_, false));
     }
 
-    //! Look up the index of a symbol.
-    //!
-    //! The function returns false if the symbol could not be found.
-    bool lookup_symbol(clingo_symbol_t name, size_t *index) {
-        if (auto ret = prop_.lookup_symbol(Clingo::Symbol{name}); ret) {
-            *index = *ret + 1;
-            return true;
-        }
-        return false;
-    }
-
-    //! Get the symbol associated with an index.
-    clingo_symbol_t get_symbol(size_t index) {
-        return prop_.get_symbol(index - 1).to_c();
-    }
-
-    //! Check if a symbol has a value in a thread.
-    bool has_value(uint32_t thread_id, size_t index) {
-        return index > 0 && prop_.has_value(thread_id, index - 1);
-    }
-
-    //! Get the value of a symbol in a thread.
-    void get_value(uint32_t thread_id, size_t index, clingoxor_value_t *value) {
-        ss_.str();
-        ss_ << prop_.get_value(thread_id, index - 1);
-        value->type = clingoxor_value_type_symbol;
-        value->symbol = Clingo::String(ss_.str().c_str()).to_c(); // NOLINT
-    }
-
-    //! Function to iterate over the thread specific assignment of symbols and values.
-    //!
-    //! Argument current should initially be set to 0. The function returns
-    //! false if no more values are available.
-    bool next(uint32_t thread_id, size_t *current) {
-        while (*current < prop_.n_values(thread_id)) {
-            ++*current;
-            if (prop_.get_symbol(*current - 1).type() != Clingo::SymbolType::Number) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    //! Extend the given model with the assignment stored in the propagator.
-    void extend_model(Clingo::Model &model) {
-        std::vector<Clingo::Symbol> symbols;
-        auto thread_id = model.thread_id();
-
-        for (size_t i = 0; next(thread_id, &i);) {
-            ss_.str("");
-            ss_ << prop_.get_value(thread_id, i - 1);
-            symbols.emplace_back(Clingo::Function("__xor", {prop_.get_symbol(i - 1), Clingo::String(ss_.str().c_str())}));
-        }
-        model.extend(symbols);
-    }
-
     //! Add the propagator statistics to clingo's statistics.
     void on_statistics(Clingo::UserStatistics& step, Clingo::UserStatistics &accu) {
         prop_.on_statistics(step, accu);
@@ -282,19 +226,15 @@ extern "C" bool clingoxor_validate_options(clingoxor_theory_t *theory) {
 }
 
 extern "C" bool clingoxor_on_model(clingoxor_theory_t *theory, clingo_model_t* model) {
-    CLINGOXOR_TRY {
-        Clingo::Model m(model);
-        theory->clingoxor->extend_model(m);
-    }
-    CLINGOXOR_CATCH;
+    return true;
 }
 
 extern "C" bool clingoxor_lookup_symbol(clingoxor_theory_t *theory, clingo_symbol_t symbol, size_t *index) {
-    return theory->clingoxor->lookup_symbol(symbol, index);
+    return false;
 }
 
 extern "C" clingo_symbol_t clingoxor_get_symbol(clingoxor_theory_t *theory, size_t index) {
-    return theory->clingoxor->get_symbol(index);
+    return Clingo::Number(0).to_c();
 }
 
 extern "C" void clingoxor_assignment_begin(clingoxor_theory_t *theory, uint32_t thread_id, size_t *index) {
@@ -304,15 +244,14 @@ extern "C" void clingoxor_assignment_begin(clingoxor_theory_t *theory, uint32_t 
 }
 
 extern "C" bool clingoxor_assignment_next(clingoxor_theory_t *theory, uint32_t thread_id, size_t *index) {
-    return theory->clingoxor->next(thread_id, index);
+    return false;
 }
 
 extern "C" bool clingoxor_assignment_has_value(clingoxor_theory_t *theory, uint32_t thread_id, size_t index) {
-    return theory->clingoxor->has_value(thread_id, index);
+    return false;
 }
 
 extern "C" void clingoxor_assignment_get_value(clingoxor_theory_t *theory, uint32_t thread_id, size_t index, clingoxor_value_t *value) {
-    theory->clingoxor->get_value(thread_id, index, value);
 }
 
 extern "C" bool clingoxor_on_statistics(clingoxor_theory_t *theory, clingo_statistics_t* step, clingo_statistics_t* accu) {

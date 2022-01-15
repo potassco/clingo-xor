@@ -155,9 +155,9 @@ void evaluate_theory(Clingo::PropagateInit &init, VarMap &var_map, std::vector<X
                 }
                 continue;
             }
-            std::vector<Clingo::Symbol> lhs_syms;
+            std::vector<index_t> lhs_syms;
             for (auto eq_lit : lhs_lits) {
-                auto res = var_map.try_emplace(eq_lit, Clingo::Number(var_map.size()));
+                auto res = var_map.try_emplace(eq_lit, var_map.size());
                 if (res.second) {
                     // Note: With this setup, variables can have at most two
                     // bounds. Data structures could be optimized for this.

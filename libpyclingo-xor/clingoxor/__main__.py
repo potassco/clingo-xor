@@ -31,18 +31,6 @@ class Application(clingo.Application):
         symbols = model.symbols(shown=True)
         sys.stdout.write(" ".join(str(symbol) for symbol in sorted(symbols)))
         sys.stdout.write('\n')
-
-        # print assignment
-        sys.stdout.write('Assignment:\n')
-        symbols = model.symbols(theory=True)
-        assignment = []
-        for symbol in sorted(symbols):
-            if symbol.match("__xor", 2):
-                args = symbol.arguments
-                assignment.append(f"{args[0]}={args[1].string}")
-        sys.stdout.write(" ".join(assignment))
-        sys.stdout.write('\n')
-
         sys.stdout.flush()
 
     def main(self, control, files):

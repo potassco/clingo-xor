@@ -8,9 +8,6 @@
 #include <map>
 #include <optional>
 
-using SymbolMap = std::unordered_map<Clingo::Symbol, index_t>;
-using SymbolVec = std::vector<Clingo::Symbol>;
-
 struct Statistics {
     void reset();
 
@@ -20,8 +17,6 @@ struct Statistics {
 //! A solver for finding an assignment satisfying a set of inequalities.
 class Solver {
 private:
-    //! Helper class to prepare the xor contstraints for solving.
-    struct Prepare;
     //! The bounds associated with a Variable.
     //!
     //! In practice, there should be a lot of variables with just one bound.
@@ -79,7 +74,7 @@ public:
     Solver(std::vector<XORConstraint> const &inequalities, bool enable_propagate);
 
     //! Prepare inequalities for solving.
-    [[nodiscard]] bool prepare(Clingo::PropagateInit &init, SymbolMap const &symbols);
+    [[nodiscard]] bool prepare(Clingo::PropagateInit &init, size_t n_variables);
 
     //! Solve the (previously prepared) problem.
     //!
@@ -179,21 +174,13 @@ public:
     void register_control(Clingo::Control &ctl);
     void on_statistics(Clingo::UserStatistics step, Clingo::UserStatistics accu);
 
-    [[nodiscard]] std::optional<index_t> lookup_symbol(Clingo::Symbol symbol) const;
-    [[nodiscard]] Clingo::Symbol get_symbol(index_t i) const;
-    [[nodiscard]] bool has_value(index_t thread_id, index_t i) const;
-    [[nodiscard]] Value get_value(index_t thread_id, index_t i) const;
-    [[nodiscard]] index_t n_values(index_t thread_id) const;
-
     void init(Clingo::PropagateInit &init) override;
     void check(Clingo::PropagateControl &ctl) override;
     void propagate(Clingo::PropagateControl &ctl, Clingo::LiteralSpan changes) override;
     void undo(Clingo::PropagateControl const &ctl, Clingo::LiteralSpan changes) noexcept override;
 
 private:
-    VarMap aux_map_;
-    SymbolMap var_map_;
-    SymbolVec var_vec_;
+    VarMap var_map_;
     std::vector<XORConstraint> iqs_;
     size_t facts_offset_{0};
     std::vector<Clingo::literal_t> facts_;

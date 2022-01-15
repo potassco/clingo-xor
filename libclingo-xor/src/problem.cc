@@ -9,10 +9,7 @@ std::ostream &operator<<(std::ostream &out, XORConstraint const &x) {
         else {
             plus = true;
         }
-        if (term.type() == Clingo::SymbolType::Number) {
-            out << "#aux_";
-        }
-        out << term;
+        out << "var_" << term;
     }
     if (x.lhs.empty()) {
         out << "0";

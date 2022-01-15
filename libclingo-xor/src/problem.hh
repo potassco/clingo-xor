@@ -4,7 +4,7 @@
 #include "util.hh"
 
 struct XORConstraint {
-    std::vector<Clingo::Symbol> lhs;
+    std::vector<index_t> lhs;
     Value rhs;
     Clingo::literal_t lit;
 };
