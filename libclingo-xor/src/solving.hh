@@ -11,7 +11,10 @@
 struct Statistics {
     void reset();
 
-    size_t pivots_{0};
+    Timer timer;
+    size_t pivots{0};
+    size_t sat{0};
+    size_t unsat{0};
 };
 
 //! A solver for finding an assignment satisfying a set of inequalities.

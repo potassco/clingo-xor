@@ -182,6 +182,7 @@ bool Solver::propagate_(Clingo::PropagateControl &ctl) {
 }
 
 bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
+    auto timer = statistics_.timer.start();
     index_t i{0};
     index_t j{0};
 
@@ -377,7 +378,7 @@ void Solver::pivot_(index_t level, index_t i, index_t j) {
     // Propagation: this operation changes the number of free variables in a row
     tableau_.eliminate(i, j);
 
-    ++statistics_.pivots_;
+    ++statistics_.pivots;
     assert_extra(check_tableau_());
     assert_extra(check_basic_());
     assert_extra(check_non_basic_());
@@ -423,6 +424,7 @@ Solver::State Solver::select_(index_t &ret_i, index_t &ret_j) {
                 return true;
             });
             if (kk == variables_.size()) {
+                ++statistics_.unsat;
                 return State::Unsatisfiable;
             }
             return State::Unknown;
@@ -431,6 +433,7 @@ Solver::State Solver::select_(index_t &ret_i, index_t &ret_j) {
 
     assert(check_solution_());
 
+    ++statistics_.sat;
     return State::Satisfiable;
 }
 
@@ -470,12 +473,24 @@ void Propagator::register_control(Clingo::Control &ctl) {
 
 void Propagator::on_statistics(Clingo::UserStatistics step, Clingo::UserStatistics accu) {
     auto step_simplex = step.add_subkey("Simplex", Clingo::StatisticsType::Map);
+    auto step_time = step_simplex.add_subkey("Time", Clingo::StatisticsType::Value);
     auto step_pivots = step_simplex.add_subkey("Pivots", Clingo::StatisticsType::Value);
+    auto step_sat = step_simplex.add_subkey("SAT", Clingo::StatisticsType::Value);
+    auto step_unsat = step_simplex.add_subkey("UNSAT", Clingo::StatisticsType::Value);
     auto accu_simplex = accu.add_subkey("Simplex", Clingo::StatisticsType::Map);
+    auto accu_time = accu_simplex.add_subkey("Time", Clingo::StatisticsType::Value);
     auto accu_pivots = accu_simplex.add_subkey("Pivots", Clingo::StatisticsType::Value);
+    auto accu_sat = accu_simplex.add_subkey("SAT", Clingo::StatisticsType::Value);
+    auto accu_unsat = accu_simplex.add_subkey("UNSAT", Clingo::StatisticsType::Value);
     for (auto const &[offset, slv] : slvs_) {
-        step_pivots.set_value(slv.statistics().pivots_);
-        accu_pivots.set_value(accu_pivots.value() + slv.statistics().pivots_);
+        step_pivots.set_value(slv.statistics().pivots);
+        step_time.set_value(slv.statistics().timer.total());
+        step_sat.set_value(slv.statistics().sat);
+        step_unsat.set_value(slv.statistics().unsat);
+        accu_pivots.set_value(accu_pivots.value() + slv.statistics().pivots);
+        accu_time.set_value(slv.statistics().timer.total());
+        accu_sat.set_value(slv.statistics().sat);
+        accu_unsat.set_value(slv.statistics().unsat);
     }
 }
 

@@ -7,6 +7,7 @@
 #include <iostream>
 #include <memory>
 #include <algorithm>
+#include <chrono>
 
 #ifdef CLINGOXOR_CROSSCHECK
 #   define assert_extra(X) assert(X) // NOLINT
@@ -228,4 +229,62 @@ public:
 private:
     std::vector<std::vector<index_t>> rows_;
     std::vector<std::vector<index_t>> cols_;
+};
+
+class Timer {
+private:
+    using Clock = std::chrono::steady_clock;
+    using Duration = std::chrono::duration<double>;
+
+public:
+    class Stopper {
+    public:
+        Stopper() = delete;
+        Stopper(Stopper const &x) = delete;
+        Stopper &operator=(Stopper const &x) = delete;
+        Stopper(Stopper &&x) noexcept
+        : timer_{x.timer_}
+        , start_{x.start_} {
+            x.timer_ = nullptr;
+        }
+        Stopper &operator=(Stopper &&x) noexcept {
+            timer_ = x.timer_;
+            start_ = x.start_;
+            x.timer_ = nullptr;
+            return *this;
+        }
+        ~Stopper() {
+            if (timer_ != nullptr) {
+                timer_->elapsed_ += Clock::now() - start_;
+            }
+        }
+    private:
+        friend class Timer;
+        Stopper(Timer *timer)
+        : timer_{timer}
+        , start_{Clock::now()} {
+        }
+        Timer *timer_;
+        Clock::time_point start_;
+    };
+
+    Stopper start() {
+        return {this};
+    }
+
+    [[nodiscard]] double total() const {
+        return elapsed_.count();
+    }
+
+    [[nodiscard]] double laps() const {
+        return laps_;
+    }
+
+    [[nodiscard]] double average() const {
+        return total() / laps();
+    }
+
+private:
+    Duration elapsed_;
+    uint64_t laps_{0};
 };
