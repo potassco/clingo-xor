@@ -16,6 +16,9 @@ struct Statistics {
     size_t pivots{0};
     size_t sat{0};
     size_t unsat{0};
+    size_t basic{0};
+    size_t non_basic{0};
+    size_t bounds{0};
 };
 
 //! A solver for finding an assignment satisfying a set of inequalities.

@@ -122,6 +122,10 @@ bool Solver::prepare(Clingo::PropagateInit &init, size_t n_variables) {
     assert_extra(check_basic_());
     assert_extra(check_non_basic_());
 
+    statistics_.basic = n_basic_;
+    statistics_.non_basic = n_non_basic_;
+    statistics_.bounds = bounds_.size();
+
     return true;
 }
 
@@ -473,29 +477,26 @@ void Propagator::register_control(Clingo::Control &ctl) {
 }
 
 void Propagator::on_statistics(Clingo::UserStatistics step, Clingo::UserStatistics accu) {
-    auto step_simplex = step.add_subkey("Simplex", Clingo::StatisticsType::Map);
-    auto step_total = step_simplex.add_subkey("Time", Clingo::StatisticsType::Value);
-    auto step_propagate = step_simplex.add_subkey("Propagate", Clingo::StatisticsType::Value);
-    auto step_pivots = step_simplex.add_subkey("Pivots", Clingo::StatisticsType::Value);
-    auto step_sat = step_simplex.add_subkey("SAT", Clingo::StatisticsType::Value);
-    auto step_unsat = step_simplex.add_subkey("UNSAT", Clingo::StatisticsType::Value);
     auto accu_simplex = accu.add_subkey("Simplex", Clingo::StatisticsType::Map);
     auto accu_total = accu_simplex.add_subkey("Time", Clingo::StatisticsType::Value);
     auto accu_propagate = accu_simplex.add_subkey("Propagate", Clingo::StatisticsType::Value);
+    auto accu_basic = accu_simplex.add_subkey("Basic", Clingo::StatisticsType::Value);
+    auto accu_non_basic = accu_simplex.add_subkey("Nonbasic", Clingo::StatisticsType::Value);
+    auto accu_bounds = accu_simplex.add_subkey("Bounds", Clingo::StatisticsType::Value);
     auto accu_pivots = accu_simplex.add_subkey("Pivots", Clingo::StatisticsType::Value);
     auto accu_sat = accu_simplex.add_subkey("SAT", Clingo::StatisticsType::Value);
     auto accu_unsat = accu_simplex.add_subkey("UNSAT", Clingo::StatisticsType::Value);
+    auto const &master_stats = slvs_.front().second.statistics();
+    accu_basic.set_value(master_stats.basic);
+    accu_non_basic.set_value(master_stats.non_basic);
+    accu_bounds.set_value(master_stats.bounds);
     for (auto const &[offset, slv] : slvs_) {
-        step_pivots.set_value(slv.statistics().pivots);
-        step_total.set_value(slv.statistics().total.total());
-        step_propagate.set_value(slv.statistics().propagate.total());
-        step_sat.set_value(slv.statistics().sat);
-        step_unsat.set_value(slv.statistics().unsat);
-        accu_pivots.set_value(accu_pivots.value() + slv.statistics().pivots);
-        accu_total.set_value(slv.statistics().total.total());
-        accu_propagate.set_value(slv.statistics().propagate.total());
-        accu_sat.set_value(slv.statistics().sat);
-        accu_unsat.set_value(slv.statistics().unsat);
+        auto const &stats = slv.statistics();
+        accu_pivots.set_value(accu_pivots.value() + stats.pivots);
+        accu_total.set_value(accu_total.value() + stats.total.total());
+        accu_propagate.set_value(accu_propagate.value() + stats.propagate.total());
+        accu_sat.set_value(accu_sat.value() + stats.sat);
+        accu_unsat.set_value(accu_unsat.value() + stats.unsat);
     }
 }
 
