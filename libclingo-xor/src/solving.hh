@@ -13,6 +13,9 @@ struct Statistics {
 
     Timer total;
     Timer propagate;
+    size_t tableau_initial{0};
+    double tableau_average{0};
+    size_t tableau_average_n{0};
     size_t pivots{0};
     size_t sat{0};
     size_t unsat{0};

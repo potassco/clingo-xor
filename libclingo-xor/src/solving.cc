@@ -125,6 +125,9 @@ bool Solver::prepare(Clingo::PropagateInit &init, size_t n_variables) {
     statistics_.basic = n_basic_;
     statistics_.non_basic = n_non_basic_;
     statistics_.bounds = bounds_.size();
+    statistics_.tableau_initial = tableau_.size();
+    statistics_.tableau_average = tableau_.size();
+    statistics_.tableau_average_n = 1;
 
     return true;
 }
@@ -247,6 +250,14 @@ bool Solver::solve(Clingo::PropagateControl &ctl, Clingo::LiteralSpan lits) {
     while (true) {
         switch (select_(i, j)) {
             case State::Satisfiable: {
+                // Note: This hopefully is not too expensive to compute.
+                // Otherwise, size could also be maintained by the tableaux to
+                // make this constant.
+                ++statistics_.tableau_average_n;
+                double n = statistics_.tableau_average_n;
+                double a = (n - 1) / n;
+                statistics_.tableau_average *= a;
+                statistics_.tableau_average += tableau_.size() / n;
                 return propagate_(ctl);
             }
             case State::Unsatisfiable: {
@@ -477,26 +488,40 @@ void Propagator::register_control(Clingo::Control &ctl) {
 }
 
 void Propagator::on_statistics(Clingo::UserStatistics step, Clingo::UserStatistics accu) {
-    auto accu_simplex = accu.add_subkey("Simplex", Clingo::StatisticsType::Map);
-    auto accu_total = accu_simplex.add_subkey("Time", Clingo::StatisticsType::Value);
-    auto accu_propagate = accu_simplex.add_subkey("Propagate", Clingo::StatisticsType::Value);
-    auto accu_basic = accu_simplex.add_subkey("Basic", Clingo::StatisticsType::Value);
-    auto accu_non_basic = accu_simplex.add_subkey("Nonbasic", Clingo::StatisticsType::Value);
-    auto accu_bounds = accu_simplex.add_subkey("Bounds", Clingo::StatisticsType::Value);
-    auto accu_pivots = accu_simplex.add_subkey("Pivots", Clingo::StatisticsType::Value);
-    auto accu_sat = accu_simplex.add_subkey("SAT", Clingo::StatisticsType::Value);
-    auto accu_unsat = accu_simplex.add_subkey("UNSAT", Clingo::StatisticsType::Value);
+    auto simplex = accu.add_subkey("Simplex", Clingo::StatisticsType::Map);
+    auto tableaux = simplex.add_subkey("Initial Tableau Size", Clingo::StatisticsType::Value);
+    auto basic = simplex.add_subkey("Basic", Clingo::StatisticsType::Value);
+    auto non_basic = simplex.add_subkey("Nonbasic", Clingo::StatisticsType::Value);
+    auto bounds = simplex.add_subkey("Bounds", Clingo::StatisticsType::Value);
+    auto threads = simplex.add_subkey("Threads", Clingo::StatisticsType::Array);
     auto const &master_stats = slvs_.front().second.statistics();
-    accu_basic.set_value(master_stats.basic);
-    accu_non_basic.set_value(master_stats.non_basic);
-    accu_bounds.set_value(master_stats.bounds);
+
+    // global values
+    basic.set_value(master_stats.basic);
+    non_basic.set_value(master_stats.non_basic);
+    bounds.set_value(master_stats.bounds);
+    tableaux.set_value(master_stats.tableau_initial);
+
+    // per thread values
+    size_t thread_id = 0;
+    threads.ensure_size(slvs_.size(), Clingo::StatisticsType::Map);
     for (auto const &[offset, slv] : slvs_) {
+        auto thread = threads[thread_id++];
+        auto time = thread.add_subkey("Time", Clingo::StatisticsType::Map);
+        auto total = time.add_subkey("Total", Clingo::StatisticsType::Value);
+        auto propagate = time.add_subkey("Propagate", Clingo::StatisticsType::Value);
+        auto avg = thread.add_subkey("Average Tableau Size", Clingo::StatisticsType::Value);
+        auto pivots = thread.add_subkey("Pivots", Clingo::StatisticsType::Value);
+        auto sat = thread.add_subkey("SAT", Clingo::StatisticsType::Value);
+        auto unsat = thread.add_subkey("UNSAT", Clingo::StatisticsType::Value);
+
         auto const &stats = slv.statistics();
-        accu_pivots.set_value(accu_pivots.value() + stats.pivots);
-        accu_total.set_value(accu_total.value() + stats.total.total());
-        accu_propagate.set_value(accu_propagate.value() + stats.propagate.total());
-        accu_sat.set_value(accu_sat.value() + stats.sat);
-        accu_unsat.set_value(accu_unsat.value() + stats.unsat);
+        pivots.set_value(pivots.value() + stats.pivots);
+        total.set_value(total.value() + stats.total.total());
+        propagate.set_value(propagate.value() + stats.propagate.total());
+        sat.set_value(sat.value() + stats.sat);
+        unsat.set_value(unsat.value() + stats.unsat);
+        avg.set_value(stats.tableau_average);
     }
 }
 
