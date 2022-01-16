@@ -104,6 +104,7 @@ public:
             auto it = std::lower_bound(row.begin(), row.end(), j);
             if (it == row.end() || *it != j) {
                 row.emplace(it, j);
+                ++size_;
             }
             auto &col = reserve_col_(j);
             auto jt = std::lower_bound(col.begin(), col.end(), i);
@@ -117,6 +118,7 @@ public:
                 auto it = std::lower_bound(row.begin(), row.end(), j);
                 if (it != row.end() && *it == j) {
                     row.erase(it);
+                    --size_;
                 }
             }
         }
@@ -193,6 +195,8 @@ public:
                         ++jt;
                     }
                 }
+                size_-= rows_[k].size();
+                size_+= row.size();
                 std::swap(rows_[k], row);
                 row.clear();
             }
@@ -203,25 +207,17 @@ public:
     //!
     //! The runtime of this function is linear in the size of the matrix.
     [[nodiscard]] size_t size() const {
-        size_t ret{0};
-        for (auto const &row : rows_) {
-            ret += row.size();
-        }
-        return ret;
+        return size_;
     }
 
     //! Equivalent to `size() == 0`.
     [[nodiscard]] bool empty() const {
-        for (auto const &row : rows_) {
-            if (!row.empty()) {
-                return false;
-            }
-        }
-        return true;
+        return size_ == 0;
     }
 
     //! Clear the tableau.
     void clear() {
+        size_ = 0;
         rows_.clear();
         cols_.clear();
     }
@@ -229,6 +225,7 @@ public:
 private:
     std::vector<std::vector<index_t>> rows_;
     std::vector<std::vector<index_t>> cols_;
+    size_t size_{0};
 };
 
 class Timer {
